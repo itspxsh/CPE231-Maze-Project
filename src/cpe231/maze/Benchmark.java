@@ -1,7 +1,6 @@
 package cpe231.maze;
 
 import java.io.File;
-import java.util.List;
 
 public class Benchmark {
 
@@ -12,7 +11,7 @@ public class Benchmark {
         "m60_60.txt", "m70_60.txt", "m80_50.txt", "m100_90.txt", "m100_100.txt"
     };
 
-    private static final int RUNS = 100; // จำนวนรอบรันเพื่อหาค่าเฉลี่ย
+    private static final int RUNS = 200; // จำนวนรอบรันเพื่อหาค่าเฉลี่ย
 
     public static void runAll() {
         System.out.println("Benchmarking A* Algorithm (" + RUNS + " runs average)");

@@ -11,7 +11,7 @@ public class Main {
 
         // --- ส่วนที่ 2: รันโชว์เส้นทาง (Visualization) สำหรับวิดีโอ/โจทย์ข้อ 3 ---
         // เลือกไฟล์ที่อยากโชว์ (แนะนำ m33_35.txt หรือ m40_40.txt)
-        String demoFile = "data/m33_35.txt"; 
+        String demoFile = "data/m100_90.txt"; 
         runDemo(demoFile);
     }
 
@@ -40,6 +40,9 @@ public class Main {
             printSummary(gaRes);
             */
 
+
+            // drawMazeWithPath(maze, aStarRes.path); // วาดภาพ
+
         } catch (IOException e) {
             System.out.println("Error: " + e.getMessage());
         }
@@ -51,6 +54,7 @@ public class Main {
         if (res.totalCost != -1) {
             System.out.println("✅ Status: Found Path");
             System.out.println("💰 Total Cost: " + res.totalCost);
+            System.out.println("🔎 Nodes Expanded: " + res.nodesExpanded);
             System.out.println("⏱ Runtime: " + String.format("%.4f", res.executionTimeNs / 1_000_000.0) + " ms");
             System.out.println("👣 Steps: " + res.path.size());
             // System.out.println("📍 Path: " + pathToString(res.path)); // ปริ้นท์พิกัดถ้ารกให้ปิด
