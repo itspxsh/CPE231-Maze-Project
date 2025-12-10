@@ -11,7 +11,7 @@ public class Main {
 
         // --- ส่วนที่ 2: รันโชว์เส้นทาง (Visualization) สำหรับวิดีโอ/โจทย์ข้อ 3 ---
         // เลือกไฟล์ที่อยากโชว์ (แนะนำ m33_35.txt หรือ m40_40.txt)
-        String demoFile = "data/m33_35.txt"; 
+        String demoFile = "data/m100_100.txt"; 
         runDemo(demoFile);
     }
 
