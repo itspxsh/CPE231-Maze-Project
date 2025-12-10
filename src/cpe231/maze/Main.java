@@ -24,7 +24,7 @@ public class Main {
             System.out.println("\n-----------------------------------");
             AlgorithmResult aStarRes = AStar.solve(maze);
             printSummary(aStarRes);
-            drawMazeWithPath(maze, aStarRes.path); // วาดภาพ
+
 
             // 2. Run Dijkstra (เปิดคอมเมนต์เมื่อมีไฟล์ Dijkstra.java)
             System.out.println("\n-----------------------------------");
@@ -36,6 +36,9 @@ public class Main {
             System.out.println("\n-----------------------------------");
             AlgorithmResult gaRes = GeneticAlgo.solve(maze);
             printSummary(gaRes);
+
+
+            drawMazeWithPath(maze, aStarRes.path); // วาดภาพ
 
         } catch (IOException e) {
             System.out.println("Error: " + e.getMessage());
