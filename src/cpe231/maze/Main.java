@@ -40,8 +40,11 @@ public class Main {
     public static void printMaze(int[][] maze) {
         for (int[] row : maze) {
             for (int val : row) {
-                if (val == -1) System.out.print("#\t");
-                else System.out.print(val + "\t");
+                if (val == -1) {
+                    System.out.printf("%4s", "#"); // จองพื้นที่ 4 ช่องให้เครื่องหมาย #
+                } else {
+                    System.out.printf("%4d", val); // จองพื้นที่ 4 ช่องให้ตัวเลข
+                }
             }
             System.out.println();
         }
