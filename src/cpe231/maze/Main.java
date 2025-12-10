@@ -1,50 +1,79 @@
 package cpe231.maze;
+
 import java.io.IOException;
+import java.util.*;
 
 public class Main {
     public static void main(String[] args) {
-        // ตรวจสอบว่าใส่ Argument มาไหม
-        if (args.length == 0) {
-            System.out.println("Usage: java -cp bin Main data/m33_35.txt");
-            return;
-        }
+        
+        // --- ส่วนที่ 1: รัน Benchmark เพื่อวัดผล (สำหรับรายงาน) ---
+        // Benchmark.runAll(); 
 
-        String mazeFile = args[0];
-        System.out.println("Loading maze from: " + mazeFile);
+        // --- ส่วนที่ 2: รันโชว์เส้นทาง (Visualization) สำหรับวิดีโอ/โจทย์ข้อ 3 ---
+        // เลือกไฟล์ที่อยากโชว์ (แนะนำ m33_35.txt หรือ m40_40.txt)
+        String demoFile = "data/m33_35.txt"; 
+        runDemo(demoFile);
+    }
 
+    public static void runDemo(String filePath) {
+        System.out.println("\n>>> DEMO MODE: " + filePath + " <<<");
         try {
-            // 1. เรียกใช้ MazeLoader อ่านไฟล์
-            int[][] maze = MazeLoader.loadMaze(mazeFile);
+            int[][] maze = MazeLoader.loadMaze(filePath);
+            
+            // 1. Run A*
+            System.out.println("\n-----------------------------------");
+            AlgorithmResult aStarRes = AStar.solve(maze);
+            printSummary(aStarRes);
+            drawMazeWithPath(maze, aStarRes.path); // วาดภาพ
 
-            // 2. แสดงผลลัพธ์เบื้องต้นเพื่อเช็คความถูกต้อง
-            System.out.println("Maze Loaded Successfully!");
-            System.out.println("Dimensions: " + maze.length + " rows x " + maze[0].length + " cols");
-            System.out.println("Start Position: (" + MazeLoader.startRow + ", " + MazeLoader.startCol + ")");
-            System.out.println("Goal Position: (" + MazeLoader.endRow + ", " + MazeLoader.endCol + ")");
+            // 2. Run Dijkstra (เปิดคอมเมนต์เมื่อมีไฟล์ Dijkstra.java)
+            /*
+            System.out.println("\n-----------------------------------");
+            AlgorithmResult dijkRes = Dijkstra.solve(maze);
+            printSummary(dijkRes);
+            */
 
-            // ลองปริ้นท์เขาวงกตออกมาดู (แสดงเป็นตัวเลข)
-            // หมายเหตุ: -1 คือกำแพง
-            printMaze(maze);
-
-            // --- พื้นที่สำหรับเรียก Algorithm ของเพื่อน ---
-            // GeneticAlgorithm.run(maze);
-            // Dijkstra.run(maze);
-            // ---------------------------------------
+            // 3. Run GA (เปิดคอมเมนต์เมื่อมีไฟล์ GeneticAlgo.java)
+            /*
+            System.out.println("\n-----------------------------------");
+            AlgorithmResult gaRes = GeneticAlgo.solve(maze);
+            printSummary(gaRes);
+            */
 
         } catch (IOException e) {
-            System.err.println("Error reading file: " + e.getMessage());
+            System.out.println("Error: " + e.getMessage());
         }
     }
 
-    // ฟังก์ชันช่วยปริ้นท์ Maze ออกมาดูเล่นๆ
-    public static void printMaze(int[][] maze) {
-        for (int[] row : maze) {
-            for (int val : row) {
-                if (val == -1) {
-                    System.out.printf("%4s", "#"); // จองพื้นที่ 4 ช่องให้เครื่องหมาย #
-                } else {
-                    System.out.printf("%4d", val); // จองพื้นที่ 4 ช่องให้ตัวเลข
-                }
+    // โจทย์ข้อ 2.3 และ 3.2: แสดงค่าผลรวม และ ลำดับตำแหน่ง
+    private static void printSummary(AlgorithmResult res) {
+        System.out.println("Algorithm: " + res.algoName);
+        if (res.totalCost != -1) {
+            System.out.println("✅ Status: Found Path");
+            System.out.println("💰 Total Cost: " + res.totalCost);
+            System.out.println("⏱ Runtime: " + String.format("%.4f", res.executionTimeNs / 1_000_000.0) + " ms");
+            System.out.println("👣 Steps: " + res.path.size());
+            // System.out.println("📍 Path: " + pathToString(res.path)); // ปริ้นท์พิกัดถ้ารกให้ปิด
+        } else {
+            System.out.println("❌ Status: Path Not Found");
+        }
+    }
+
+    // โจทย์ข้อ 3.1: แสดงเขาวงกตและเส้นทางที่เลือก (ใช้ * แทนเส้นทาง)
+    private static void drawMazeWithPath(int[][] maze, List<int[]> path) {
+        System.out.println("\n[ Visual Map ]");
+        Set<String> pathSet = new HashSet<>();
+        if (path != null) {
+            for (int[] p : path) pathSet.add(p[0] + "," + p[1]);
+        }
+
+        for (int i = 0; i < maze.length; i++) {
+            for (int j = 0; j < maze[0].length; j++) {
+                if (i == MazeLoader.startRow && j == MazeLoader.startCol) System.out.print("S  ");
+                else if (i == MazeLoader.endRow && j == MazeLoader.endCol) System.out.print("G  ");
+                else if (maze[i][j] == -1) System.out.print("## ");
+                else if (pathSet.contains(i + "," + j)) System.out.print("** "); // ทางเดินที่เป็นคำตอบ
+                else System.out.printf("%-2d ", maze[i][j]); // ทางเดินปกติ
             }
             System.out.println();
         }
