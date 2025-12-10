@@ -11,7 +11,7 @@ public class Main {
 
         // --- ส่วนที่ 2: รันโชว์เส้นทาง (Visualization) สำหรับวิดีโอ/โจทย์ข้อ 3 ---
         // เลือกไฟล์ที่อยากโชว์ (แนะนำ m33_35.txt หรือ m40_40.txt)
-        String demoFile = "data/m33_35.txt"; 
+        String demoFile = "data/m50_50.txt"; 
         runDemo(demoFile);
     }
 
@@ -24,7 +24,7 @@ public class Main {
             System.out.println("\n-----------------------------------");
             AlgorithmResult aStarRes = AStar.solve(maze);
             printSummary(aStarRes);
-            drawMazeWithPath(maze, aStarRes.path); // วาดภาพ
+            
 
             // 2. Run Dijkstra (เปิดคอมเมนต์เมื่อมีไฟล์ Dijkstra.java)
             System.out.println("\n-----------------------------------");
@@ -36,6 +36,9 @@ public class Main {
             System.out.println("\n-----------------------------------");
             AlgorithmResult gaRes = GeneticAlgo.solve(maze);
             printSummary(gaRes);
+
+
+            drawMazeWithPath(maze, aStarRes.path); // วาดภาพ
 
         } catch (IOException e) {
             System.out.println("Error: " + e.getMessage());
