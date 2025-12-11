@@ -1,19 +1,25 @@
 package cpe231.maze;
 
+// MazeLoader.java (โค้ดที่แก้ไขแล้ว)
+
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
 
 public class MazeLoader {
     public static final int WALL = -1;
-    public static int startRow, startCol, endRow, endCol;
 
-    public static int[][] loadMaze(String filePath) throws IOException {
+    // เมธอดนี้จะคืนค่า MazeInfo แทน
+    public static MazeInfo loadMaze(String filePath) throws IOException {
         List<int[]> mazeList = new ArrayList<>();
         BufferedReader reader = new BufferedReader(new FileReader(filePath));
         String line;
         int rowCount = 0;
         Pattern pattern = Pattern.compile("\"(\\d+)\"|([#SG])");
+
+        // ประกาศตัวแปร Local สำหรับเก็บพิกัด Start/End
+        int startR = -1, startC = -1;
+        int endR = -1, endC = -1;
 
         while ((line = reader.readLine()) != null) {
             if (line.trim().isEmpty()) continue;
@@ -27,9 +33,9 @@ public class MazeLoader {
                     String symbol = matcher.group(2);
                     if (symbol.equals("#")) rowValues.add(WALL);
                     else if (symbol.equals("S")) {
-                        rowValues.add(0); startRow = rowCount; startCol = colCount;
+                        rowValues.add(0); startR = rowCount; startC = colCount; // ✅ เก็บค่าลง Local Variable
                     } else if (symbol.equals("G")) {
-                        rowValues.add(0); endRow = rowCount; endCol = colCount;
+                        rowValues.add(0); endR = rowCount; endC = colCount;     // ✅ เก็บค่าลง Local Variable
                     }
                 }
                 colCount++;
@@ -40,6 +46,10 @@ public class MazeLoader {
             }
         }
         reader.close();
-        return mazeList.toArray(new int[0][]);
+        
+        int[][] mazeArray = mazeList.toArray(new int[0][]);
+        
+        // คืนค่า Maze Array พร้อมพิกัด Start/End ในรูปแบบ MazeInfo
+        return new MazeInfo(mazeArray, new Coordinate(startR, startC), new Coordinate(endR, endC));
     }
 }

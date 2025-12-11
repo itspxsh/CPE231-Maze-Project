@@ -14,7 +14,7 @@ public class AStar {
      */
     private static void siftUp(int[] heapIndex, int[] heapF, int[] heapG, int idx, int newF, int newIdx, int newG) {
         while (idx > 0) {
-            int p = (idx - 1) >>> 1;
+            int p = (idx - 1) / 2; // ปรับปรุงเพื่อความชัดเจน (ใช้ / 2 แทน >>> 1)
             
             // Comparison: f[p] > newF OR (f[p] == newF AND g[p] > newG)
             boolean shouldSwap = heapF[p] > newF || (heapF[p] == newF && heapG[p] > newG);
@@ -37,9 +37,9 @@ public class AStar {
         int nF = heapF[idx];
         int nG = heapG[idx]; // ค่า G ของโหนดปัจจุบัน
 
-        int half = size >>> 1;
+        int half = size / 2; // ปรับปรุงเพื่อความชัดเจน (ใช้ / 2 แทน >>> 1)
         while (idx < half) {
-            int left = (idx << 1) + 1;
+            int left = (idx * 2) + 1; // ปรับปรุงเพื่อความชัดเจน (ใช้ * 2 + 1 แทน << 1 + 1)
             int small = left;
             int right = left + 1;
 
@@ -83,19 +83,17 @@ public class AStar {
     // ===============================================================
     //                       A* (Lazy Heap with G-Tie-Breaking)
     // ===============================================================
-    public static AlgorithmResult solve(int[][] maze) {
+    public static AlgorithmResult solve(int[][] maze, int startR, int startC, int goalR, int goalC) {
 
         long startTime = System.nanoTime();
 
         int rows = maze.length, cols = maze[0].length;
         int N = rows * cols;
 
-        int startIdx = MazeLoader.startRow * cols + MazeLoader.startCol;
-        int goalIdx = MazeLoader.endRow * cols + MazeLoader.endCol;
+        int startIdx = startR * cols + startC;
+        int goalIdx = goalR * cols + goalC;
         
-        // Cache Goal R/C 
-        int goalR = MazeLoader.endRow;
-        int goalC = MazeLoader.endCol;
+        
 
         // ---- Flatten ----
         int[] flat = new int[N];
@@ -118,10 +116,6 @@ public class AStar {
         int[] heapF = new int[maxHeapSize];
         int[] heapG = new int[maxHeapSize]; // NEW: ต้องเก็บค่า G ไว้ใน Heap ด้วยเพื่อ Tie-breaking
         int heapSize = 0;
-
-        // Start node 
-        int startR = startIdx / cols;
-        int startC = startIdx % cols;
         
         g[startIdx] = 0;
         heapIndex[0] = startIdx;
@@ -146,6 +140,7 @@ public class AStar {
                 siftDown(heapIndex, heapF, heapG, heapSize, 0); // ต้องส่ง heapG
             }
 
+            // Lazy Deletion: ถ้าโหนดที่ดึงออกมามี Cost ที่สูงกว่าค่า g[curr] ที่บันทึกไว้ ให้ข้ามไป
             if (closed[curr]) continue;
             closed[curr] = true;
 
@@ -169,23 +164,28 @@ public class AStar {
             int cost;
             int nxtR, nxtC; 
 
-            // ---- Neighbor Exploration (Relaxation Inline + Tie-Breaking) ----
+            // ---- Neighbor Exploration (Relaxation Inline + Path Re-Checking) ----
             
             // 1. UP
             nxt = curr - cols;
             if (curr >= cols) { 
                 cost = flat[nxt];
-                if (cost != -1 && !closed[nxt]) {
+                if (cost != -1) { // ✅ อนุญาตให้ Relaxation เสมอ (ลบ !closed[nxt])
                     newG = baseG + cost; 
-                    if (newG < g[nxt]) {
+                    if (newG < g[nxt]) { // 💡 Relaxation Check
                         g[nxt] = newG;
                         parent[nxt] = curr;
+                        
+                        // 💡 NEW LOGIC: Path Re-Checking (Un-close/Re-open)
+                        if (closed[nxt]) {
+                            closed[nxt] = false;
+                        }
                         
                         nxtR = currR - 1; 
                         nxtC = currC;
                         f = newG + Math.abs(goalR - nxtR) + Math.abs(goalC - nxtC);
                         
-                        siftUp(heapIndex, heapF, heapG, heapSize, f, nxt, newG); // ส่ง heapG, newG
+                        siftUp(heapIndex, heapF, heapG, heapSize, f, nxt, newG); 
                         heapSize++;
                     }
                 }
@@ -195,17 +195,22 @@ public class AStar {
             nxt = curr + cols;
             if (curr < N - cols) { 
                 cost = flat[nxt];
-                if (cost != -1 && !closed[nxt]) {
+                if (cost != -1) { // ✅ อนุญาตให้ Relaxation เสมอ (ลบ !closed[nxt])
                     newG = baseG + cost; 
                     if (newG < g[nxt]) {
                         g[nxt] = newG;
                         parent[nxt] = curr;
+
+                        // 💡 NEW LOGIC: Path Re-Checking (Un-close/Re-open)
+                        if (closed[nxt]) {
+                            closed[nxt] = false;
+                        }
                         
                         nxtR = currR + 1; 
                         nxtC = currC;
                         f = newG + Math.abs(goalR - nxtR) + Math.abs(goalC - nxtC);
                         
-                        siftUp(heapIndex, heapF, heapG, heapSize, f, nxt, newG); // ส่ง heapG, newG
+                        siftUp(heapIndex, heapF, heapG, heapSize, f, nxt, newG); 
                         heapSize++;
                     }
                 }
@@ -215,17 +220,22 @@ public class AStar {
             nxt = curr - 1;
             if (curr % cols != 0) { 
                 cost = flat[nxt];
-                if (cost != -1 && !closed[nxt]) {
+                if (cost != -1) { // ✅ อนุญาตให้ Relaxation เสมอ (ลบ !closed[nxt])
                     newG = baseG + cost; 
                     if (newG < g[nxt]) {
                         g[nxt] = newG;
                         parent[nxt] = curr;
+
+                        // 💡 NEW LOGIC: Path Re-Checking (Un-close/Re-open)
+                        if (closed[nxt]) {
+                            closed[nxt] = false;
+                        }
                         
                         nxtR = currR;
                         nxtC = currC - 1; 
                         f = newG + Math.abs(goalR - nxtR) + Math.abs(goalC - nxtC);
                         
-                        siftUp(heapIndex, heapF, heapG, heapSize, f, nxt, newG); // ส่ง heapG, newG
+                        siftUp(heapIndex, heapF, heapG, heapSize, f, nxt, newG); 
                         heapSize++;
                     }
                 }
@@ -235,17 +245,22 @@ public class AStar {
             nxt = curr + 1;
             if ((curr + 1) % cols != 0) { 
                 cost = flat[nxt];
-                if (cost != -1 && !closed[nxt]) {
+                if (cost != -1) { // ✅ อนุญาตให้ Relaxation เสมอ (ลบ !closed[nxt])
                     newG = baseG + cost; 
                     if (newG < g[nxt]) {
                         g[nxt] = newG;
                         parent[nxt] = curr;
+
+                        // 💡 NEW LOGIC: Path Re-Checking (Un-close/Re-open)
+                        if (closed[nxt]) {
+                            closed[nxt] = false;
+                        }
                         
                         nxtR = currR;
                         nxtC = currC + 1; 
                         f = newG + Math.abs(goalR - nxtR) + Math.abs(goalC - nxtC);
                         
-                        siftUp(heapIndex, heapF, heapG, heapSize, f, nxt, newG); // ส่ง heapG, newG
+                        siftUp(heapIndex, heapF, heapG, heapSize, f, nxt, newG); 
                         heapSize++;
                     }
                 }

@@ -18,14 +18,17 @@ public class Read {
         System.out.println("Loading maze from: " + mazeFile);
 
         try {
-            // 1. เรียกใช้ MazeLoader อ่านไฟล์
-            int[][] maze = MazeLoader.loadMaze(mazeFile);
+            // 🛑 แก้ไข: ต้องรับ MazeInfo
+            MazeInfo info = MazeLoader.loadMaze(mazeFile);
+            int[][] maze = info.maze(); // ดึง Maze Array ออกมา
 
             // 2. แสดงผลลัพธ์เบื้องต้นเพื่อเช็คความถูกต้อง
             System.out.println("Maze Loaded Successfully!");
+            // 🛑 แก้ไข: ใช้ info.maze().length แทน maze.length
             System.out.println("Dimensions: " + maze.length + " rows x " + maze[0].length + " cols");
-            System.out.println("Start Position: (" + MazeLoader.startRow + ", " + MazeLoader.startCol + ")");
-            System.out.println("Goal Position: (" + MazeLoader.endRow + ", " + MazeLoader.endCol + ")");
+            // 🛑 แก้ไข: ใช้ info.start().r() แทน MazeLoader.startRow
+            System.out.println("Start Position: (" + info.start().r() + ", " + info.start().c() + ")");
+            System.out.println("Goal Position: (" + info.end().r() + ", " + info.end().c() + ")");
 
             // ลองปริ้นท์เขาวงกตออกมาดู (แสดงเป็นตัวเลข)
             // หมายเหตุ: -1 คือกำแพง

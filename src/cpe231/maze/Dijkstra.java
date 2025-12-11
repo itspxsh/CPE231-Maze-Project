@@ -4,14 +4,18 @@ import java.util.*;
 
 public class Dijkstra {
 
-    public static AlgorithmResult solve(int[][] maze) {
+    // รับ int[][] และพิกัด Start/Goal เป็น Parameter
+    public static AlgorithmResult solve(int[][] maze, int startR, int startC, int goalR, int goalC) {
         long start = System.nanoTime();
         
         int rows = maze.length;
         int cols = maze[0].length;
         int numNodes = rows * cols;
-        int startIdx = MazeLoader.startRow * cols + MazeLoader.startCol;
-        int endIdx = MazeLoader.endRow * cols + MazeLoader.endCol;
+        
+        // ใช้ Parameter startR/startC
+        int startIdx = startR * cols + startC;
+        // ใช้ Parameter goalR/goalC
+        int endIdx = goalR * cols + goalC; 
 
         // 1. Flatten Maze: แปลง 2D เป็น 1D Array เพื่อความเร็วสูงสุด (Cache Locality)
         int[] flatMaze = new int[numNodes];

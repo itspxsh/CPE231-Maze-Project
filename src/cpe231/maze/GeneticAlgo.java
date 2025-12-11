@@ -34,14 +34,16 @@ public class GeneticAlgo {
         }
     }
 
-    public static AlgorithmResult solve(int[][] maze) {
+    // 🛑 แก้ไข Signature: รับพิกัด Start/Goal เป็น Parameter
+    public static AlgorithmResult solve(int[][] maze, int startR, int startC, int endR, int endC) {
         long startTime = System.nanoTime();
         int rows = maze.length;
         int cols = maze[0].length;
-        int startR = MazeLoader.startRow, startC = MazeLoader.startCol;
-        int endR = MazeLoader.endRow, endC = MazeLoader.endCol;
+        // int startR = MazeLoader.startRow, startC = MazeLoader.startCol; // 🛑 ลบทิ้ง
+        // int endR = MazeLoader.endRow, endC = MazeLoader.endCol;       // 🛑 ลบทิ้ง
 
         // 1. Initial population fn.
+        // 🛑 ส่งพิกัดใหม่เข้าไปใน initializePopulation
         List<Individual> population = initializePopulation(maze, rows, cols, startR, startC, endR, endC);
 
         if (population.isEmpty()) {

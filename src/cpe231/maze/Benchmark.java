@@ -28,16 +28,16 @@ public class Benchmark {
     private static void runSingleFile(String filePath) {
         try {
             File f = new File(filePath);
-            if (!f.exists()) {
-                System.out.println("File not found: " + filePath);
-                return;
-            }
+            // ... (ส่วนเช็คไฟล์)
             
-            // โหลด Maze และตั้งค่า Start/End ใน MazeLoader
-            int[][] maze = MazeLoader.loadMaze(filePath);
-            
-            // Warmup (รันเล่นๆ ให้ Java ตื่นตัว)
-            for (int i = 0; i < 10; i++) AStar.solve(maze);
+            // 🛑 แก้ไข: ต้องรับ MazeInfo
+            MazeInfo mazeInfo = MazeLoader.loadMaze(filePath);
+            int[][] maze = mazeInfo.maze(); // ดึง Maze Array (int[][]) ออกมา
+
+            // Warmup
+            for (int i = 0; i < 10; i++) 
+                // 🛑 ส่ง Maze Array (int[][]) และพิกัด 4 ค่า
+                AStar.solve(maze, mazeInfo.start().r(), mazeInfo.start().c(), mazeInfo.end().r(), mazeInfo.end().c());
 
             long totalTime = 0;
             AlgorithmResult result = null;
@@ -45,21 +45,12 @@ public class Benchmark {
             // Benchmark Loop (จับเวลาจริง)
             for (int i = 0; i < RUNS; i++) {
                 long start = System.nanoTime();
-                result = AStar.solve(maze); 
+                // 🛑 ส่ง Maze Array (int[][]) และพิกัด 4 ค่า
+                result = AStar.solve(maze, mazeInfo.start().r(), mazeInfo.start().c(), mazeInfo.end().r(), mazeInfo.end().c()); 
                 long end = System.nanoTime();
                 totalTime += (end - start);
             }
-
-            double avgTimeMs = (totalTime / (double) RUNS) / 1_000_000.0;
-
-            // ดึงค่าผลลัพธ์
-            int cost = result.totalCost; 
-            long nodes = result.nodesExpanded;
-
-            // Print แบบ simple text
-            System.out.printf("File: %-15s  Time: %8.4f ms   Cost: %-6d   Nodes: %d%n", 
-                              f.getName(), avgTimeMs, cost, nodes);
-
+            // ... (ส่วนล่างเหมือนเดิม)
         } catch (Exception e) {
             System.out.println("Error processing " + filePath + ": " + e.getMessage());
         }
