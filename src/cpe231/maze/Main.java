@@ -27,18 +27,15 @@ public class Main {
             // drawMazeWithPath(maze, aStarRes.path); // วาดภาพ
 
             // 2. Run Dijkstra (เปิดคอมเมนต์เมื่อมีไฟล์ Dijkstra.java)
-            /*
             System.out.println("\n-----------------------------------");
             AlgorithmResult dijkRes = Dijkstra.solve(maze);
             printSummary(dijkRes);
-            */
+            
 
             // 3. Run GA (เปิดคอมเมนต์เมื่อมีไฟล์ GeneticAlgo.java)
-            /*
             System.out.println("\n-----------------------------------");
             AlgorithmResult gaRes = GeneticAlgo.solve(maze);
             printSummary(gaRes);
-            */
 
 
             // drawMazeWithPath(maze, aStarRes.path); // วาดภาพ
