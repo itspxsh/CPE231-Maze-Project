@@ -24,7 +24,7 @@ public class Main {
             System.out.println("\n-----------------------------------");
             AlgorithmResult aStarRes = AStar.solve(maze);
             printSummary(aStarRes);
-            drawMazeWithPath(maze, aStarRes.path); // วาดภาพ
+            // drawMazeWithPath(maze, aStarRes.path); // วาดภาพ
 
             // 2. Run Dijkstra (เปิดคอมเมนต์เมื่อมีไฟล์ Dijkstra.java)
             /*

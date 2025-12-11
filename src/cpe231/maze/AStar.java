@@ -3,34 +3,39 @@ package cpe231.maze;
 import java.util.*;
 
 public class AStar {
-    private static class Node implements Comparable<Node> {
-        int index, g, f, h;
-        public Node(int index, int g, int h) {
-            this.index = index; this.g = g; this.h = h; this.f = g + h;
-        }
-        public int compareTo(Node o) {
-            return (this.f == o.f) ? Integer.compare(this.h, o.h) : Integer.compare(this.f, o.f);
-        }
-    }
 
     // ===============================================================
-    //           HEAP HELPERS (Optimized with Bitwise Ops)
+    //           HEAP HELPERS (Optimized with Tie-Breaking)
     // ===============================================================
-    private static void siftUp(int[] heapIndex, int[] heapF, int idx, int newF, int newIdx) {
+    /**
+     * Helper สำหรับการ Tie-breaking ในกรณีที่ f เท่ากัน: เลือกโหนดที่มี g น้อยกว่า (Shallow)
+     * หรืออาจเลือกโหนดที่มี g มากกว่า (Deep, เพื่อกระตุ้นให้ค้นหาไปข้างหน้า)
+     * เราจะเลือกโหนดที่มี g น้อยกว่า เพื่อรักษา Consistent (f ที่เท่ากัน)
+     */
+    private static void siftUp(int[] heapIndex, int[] heapF, int[] heapG, int idx, int newF, int newIdx, int newG) {
         while (idx > 0) {
             int p = (idx - 1) >>> 1;
-            if (heapF[p] <= newF) break;
+            
+            // Comparison: f[p] > newF OR (f[p] == newF AND g[p] > newG)
+            boolean shouldSwap = heapF[p] > newF || (heapF[p] == newF && heapG[p] > newG);
+
+            if (!shouldSwap) break;
+            
+            // Swap: ย้าย Parent ลงมา
             heapIndex[idx] = heapIndex[p];
             heapF[idx] = heapF[p];
+            heapG[idx] = heapG[p]; // Swap G array ด้วย
             idx = p;
         }
         heapIndex[idx] = newIdx;
         heapF[idx] = newF;
+        heapG[idx] = newG;
     }
 
-    private static void siftDown(int[] heapIndex, int[] heapF, int size, int idx) {
+    private static void siftDown(int[] heapIndex, int[] heapF, int[] heapG, int size, int idx) {
         int nIdx = heapIndex[idx];
         int nF = heapF[idx];
+        int nG = heapG[idx]; // ค่า G ของโหนดปัจจุบัน
 
         int half = size >>> 1;
         while (idx < half) {
@@ -38,23 +43,35 @@ public class AStar {
             int small = left;
             int right = left + 1;
 
-            if (right < size && heapF[right] < heapF[left]) {
-                small = right;
+            if (right < size) {
+                // Tie-breaking: ถ้า f เท่ากัน ให้เลือกโหนดที่มี g น้อยกว่า (เพื่อรักษา Order)
+                boolean rightIsSmaller = heapF[right] < heapF[left] || 
+                                         (heapF[right] == heapF[left] && heapG[right] < heapG[left]);
+                                         
+                if (rightIsSmaller) {
+                    small = right;
+                }
             }
 
-            if (nF <= heapF[small]) break;
+            // Comparison: nF > f[small] OR (nF == f[small] AND nG > g[small])
+            boolean shouldSwap = nF > heapF[small] || (nF == heapF[small] && nG > heapG[small]);
+            
+            if (!shouldSwap) break;
 
+            // Swap: ย้าย Child ขึ้นมา
             heapIndex[idx] = heapIndex[small];
             heapF[idx] = heapF[small];
+            heapG[idx] = heapG[small]; // Swap G array ด้วย
             idx = small;
         }
 
         heapIndex[idx] = nIdx;
         heapF[idx] = nF;
+        heapG[idx] = nG;
     }
 
     // ===============================================================
-    //           PATH RECONSTRUCTION
+    //           PATH RECONSTRUCTION (เหมือนเดิม)
     // ===============================================================
     private static List<int[]> reconstruct(int[] parent, int cols, int curr) {
         List<int[]> path = new ArrayList<>();
@@ -64,7 +81,7 @@ public class AStar {
     }
     
     // ===============================================================
-    //                       A* (Maximum Optimization)
+    //                       A* (Lazy Heap with G-Tie-Breaking)
     // ===============================================================
     public static AlgorithmResult solve(int[][] maze) {
 
@@ -99,15 +116,17 @@ public class AStar {
         int maxHeapSize = N * 4; 
         int[] heapIndex = new int[maxHeapSize]; 
         int[] heapF = new int[maxHeapSize];
+        int[] heapG = new int[maxHeapSize]; // NEW: ต้องเก็บค่า G ไว้ใน Heap ด้วยเพื่อ Tie-breaking
         int heapSize = 0;
 
-        // Start node (Heuristic calculation: หาร/Modulo เพียงครั้งเดียว)
+        // Start node 
         int startR = startIdx / cols;
         int startC = startIdx % cols;
         
         g[startIdx] = 0;
         heapIndex[0] = startIdx;
         heapF[0] = Math.abs(goalR - startR) + Math.abs(goalC - startC);
+        heapG[0] = 0; // G = 0
         heapSize = 1;
 
         long expanded = 0;
@@ -123,7 +142,8 @@ public class AStar {
             if (heapSize > 0) {
                 heapIndex[0] = heapIndex[heapSize];
                 heapF[0] = heapF[heapSize];
-                siftDown(heapIndex, heapF, heapSize, 0);
+                heapG[0] = heapG[heapSize]; // ต้องย้าย G
+                siftDown(heapIndex, heapF, heapG, heapSize, 0); // ต้องส่ง heapG
             }
 
             if (closed[curr]) continue;
@@ -149,7 +169,7 @@ public class AStar {
             int cost;
             int nxtR, nxtC; 
 
-            // ---- Neighbor Exploration (Zero-Division/Modulo Heuristic) ----
+            // ---- Neighbor Exploration (Relaxation Inline + Tie-Breaking) ----
             
             // 1. UP
             nxt = curr - cols;
@@ -161,12 +181,11 @@ public class AStar {
                         g[nxt] = newG;
                         parent[nxt] = curr;
                         
-                        // INLINE MANHATTAN (ใช้ ลบ/บวก จาก currR/currC)
                         nxtR = currR - 1; 
                         nxtC = currC;
                         f = newG + Math.abs(goalR - nxtR) + Math.abs(goalC - nxtC);
                         
-                        siftUp(heapIndex, heapF, heapSize, f, nxt);
+                        siftUp(heapIndex, heapF, heapG, heapSize, f, nxt, newG); // ส่ง heapG, newG
                         heapSize++;
                     }
                 }
@@ -182,12 +201,11 @@ public class AStar {
                         g[nxt] = newG;
                         parent[nxt] = curr;
                         
-                        // INLINE MANHATTAN (ใช้ ลบ/บวก จาก currR/currC)
                         nxtR = currR + 1; 
                         nxtC = currC;
                         f = newG + Math.abs(goalR - nxtR) + Math.abs(goalC - nxtC);
                         
-                        siftUp(heapIndex, heapF, heapSize, f, nxt);
+                        siftUp(heapIndex, heapF, heapG, heapSize, f, nxt, newG); // ส่ง heapG, newG
                         heapSize++;
                     }
                 }
@@ -203,12 +221,11 @@ public class AStar {
                         g[nxt] = newG;
                         parent[nxt] = curr;
                         
-                        // INLINE MANHATTAN (ใช้ ลบ/บวก จาก currR/currC)
                         nxtR = currR;
                         nxtC = currC - 1; 
                         f = newG + Math.abs(goalR - nxtR) + Math.abs(goalC - nxtC);
                         
-                        siftUp(heapIndex, heapF, heapSize, f, nxt);
+                        siftUp(heapIndex, heapF, heapG, heapSize, f, nxt, newG); // ส่ง heapG, newG
                         heapSize++;
                     }
                 }
@@ -224,12 +241,11 @@ public class AStar {
                         g[nxt] = newG;
                         parent[nxt] = curr;
                         
-                        // INLINE MANHATTAN (ใช้ ลบ/บวก จาก currR/currC)
                         nxtR = currR;
                         nxtC = currC + 1; 
                         f = newG + Math.abs(goalR - nxtR) + Math.abs(goalC - nxtC);
                         
-                        siftUp(heapIndex, heapF, heapSize, f, nxt);
+                        siftUp(heapIndex, heapF, heapG, heapSize, f, nxt, newG); // ส่ง heapG, newG
                         heapSize++;
                     }
                 }
