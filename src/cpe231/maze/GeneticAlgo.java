@@ -4,18 +4,20 @@ import java.util.*;
 
 public class GeneticAlgo {
 
-    // --- Optimized Hyperparameters ---
-    private static final int POPULATION_SIZE = 150;
-    private static final int MAX_GENERATIONS = 3000;
-    private static final double CROSSOVER_RATE = 0.85;
-    private static final double MUTATION_RATE = 0.15;
-    private static final int ELITISM_COUNT = 8;
-    private static final int TOURNAMENT_SIZE = 7;
-    private static final int STAGNATION_THRESHOLD = 80;
+// --- Optimized Hyperparameters for Speed (< 10s) ---
+    private static final int POPULATION_SIZE = 60;    // เดิม 150 (ลดภาระการคำนวณต่อรุ่น)
+    private static final int MAX_GENERATIONS = 1000;  // เดิม 3000
+    private static final double CROSSOVER_RATE = 0.9; // เพิ่มนิดหน่อยเพื่อให้เจอคำตอบไวขึ้น
+    private static final double MUTATION_RATE = 0.1;  // เดิม 0.15
+    private static final int ELITISM_COUNT = 6;       // ปรับตามสัดส่วนประชากร
+    private static final int TOURNAMENT_SIZE = 5;
     
-    // Local Search Parameters
-    private static final int LOCAL_SEARCH_INTENSITY = 25;
-    private static final double LOCAL_SEARCH_PROB = 0.4;
+    // สำคัญ! ลดเวลาการรอคอย
+    private static final int STAGNATION_THRESHOLD = 15; // เดิม 80 (ถ้านิ่ง 15 รุ่นก็ถือว่าตันแล้ว)
+    
+    // Local Search Parameters (ตัวกินเวลาหลัก)
+    private static final int LOCAL_SEARCH_INTENSITY = 5;   // เดิม 25 (หาแค่ 5 รอบพอ)
+    private static final double LOCAL_SEARCH_PROB = 0.05;  // เดิม 0.4 (ทำน้อยลงมากๆ เน้นเฉพาะตัวเก่งจริง)
 
     // Direction arrays
     private static final int[] DR = {-1, 1, 0, 0};
@@ -80,9 +82,9 @@ public class GeneticAlgo {
         int stagnationCount = 0;
         int lastBestCost = Integer.MAX_VALUE;
         
-        // ✅ [จุดที่ 1] เพิ่มตัวแปรนับจำนวน Boost
+        // ✅ ปรับแก้ตรงนี้: ลดโควตา Boost เหลือ 1 ครั้งก็พอ
         int boostCounter = 0; 
-        int MAX_BOOSTS = 3; // ถ้า Boost ครบ 3 รอบแล้วผลยังไม่เปลี่ยน ให้พอ (หยุด)
+        int MAX_BOOSTS = 1; // เดิม 3 (แค่ครั้งเดียวก็รู้เรื่องแล้วสำหรับ Maze นี้)
 
         System.out.println(">>> GA Started: Seeking Near Optimal Solution...");
 
@@ -108,11 +110,11 @@ public class GeneticAlgo {
             boolean isBoosting = false;
             if (stagnationCount >= STAGNATION_THRESHOLD) {
                 
-                // ✅ [จุดที่ 2] เพิ่มเงื่อนไขเช็คว่า Boost มาเยอะเกินไปหรือยัง
                 boostCounter++;
                 if (boostCounter > MAX_BOOSTS) {
-                    System.out.println(">>> Converged! No improvement after multiple boosts.");
-                    break; // 🛑 สั่งหยุด Loop ทันที
+                    // เปลี่ยนข้อความให้ดู Professional
+                    System.out.println(">>> Converged! Optimization complete."); 
+                    break; 
                 }
                 
                 isBoosting = true;
