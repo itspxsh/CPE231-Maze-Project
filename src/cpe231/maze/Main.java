@@ -10,8 +10,8 @@ public class Main {
         // Benchmark.runAll(); 
 
         // --- ส่วนที่ 2: รันโชว์เส้นทาง (Visualization) สำหรับวิดีโอ/โจทย์ข้อ 3 ---
-        // เลือกไฟล์ที่อยากโชว์ (แนะนำ m33_35.txt หรือ m40_40.txt)
-        String demoFile = "data/m50_50.txt"; 
+        // เลือกไฟล์ที่อยากโชว์ (แนะนำ m33_35.txt หรือ m100_100.txt)
+        String demoFile = "data/m100_100.txt"; 
         runDemo(demoFile);
     }
 
@@ -20,25 +20,48 @@ public class Main {
         try {
             int[][] maze = MazeLoader.loadMaze(filePath);
             
-            // 1. Run A*
+            // 1. Run A* (เพื่อใช้เป็น Baseline หรือคำตอบที่ดีที่สุด)
             System.out.println("\n-----------------------------------");
             AlgorithmResult aStarRes = AStar.solve(maze);
             printSummary(aStarRes);
             
-
             // 2. Run Dijkstra (เปิดคอมเมนต์เมื่อมีไฟล์ Dijkstra.java)
             System.out.println("\n-----------------------------------");
             AlgorithmResult dijkRes = Dijkstra.solve(maze);
             printSummary(dijkRes);
             
-
-            // 3. Run GA (เปิดคอมเมนต์เมื่อมีไฟล์ GeneticAlgo.java)
+            // 3. Run GA (พระเอกของเรา)
             System.out.println("\n-----------------------------------");
             AlgorithmResult gaRes = GeneticAlgo.solve(maze);
             printSummary(gaRes);
 
+            // --- ส่วนที่เพิ่ม: เปรียบเทียบผลลัพธ์ (Gap Calculation) ---
+            System.out.println("\n===================================");
+            System.out.println("       🏆 FINAL VERDICT 🏆       ");
+            System.out.println("===================================");
+            
+            if (aStarRes.totalCost != -1 && gaRes.totalCost != -1) {
+                System.out.println("Best Cost (A* / Optimal): " + aStarRes.totalCost);
+                System.out.println("Your Cost (GA): " + gaRes.totalCost);
 
-            drawMazeWithPath(maze, aStarRes.path); // วาดภาพ
+                // คำนวณส่วนต่าง
+                double gap = gaRes.totalCost - aStarRes.totalCost;
+                System.out.println("Gap from Optimal: " + gap); 
+
+                // ตัดสินผลลัพธ์
+                if (gap == 0) {
+                    System.out.println(">>> Status: Perfect Solution! (Optimal) 🌟");
+                } else if (gap <= 20) {
+                    System.out.println(">>> Status: Near Optimal Solution (Excellent!) ✅");
+                } else {
+                    System.out.println(">>> Status: Good Solution (Can be improved) ⚠️");
+                }
+            } else {
+                System.out.println("Error: One of the algorithms failed to find a path.");
+            }
+
+            // เลือกวาดเส้นทางของ GA เพื่อโชว์ใน Video
+            // drawMazeWithPath(maze, gaRes.path); 
 
         } catch (IOException e) {
             System.out.println("Error: " + e.getMessage());
