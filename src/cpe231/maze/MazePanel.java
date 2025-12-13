@@ -52,9 +52,8 @@ public class MazePanel extends JPanel {
         int preferredHeight = (int)(currentCellSize * rows);
         setPreferredSize(new Dimension(currentWidth, preferredHeight));
 
-        // คำนวณ Font Size
-        int costFontSize = Math.max(8, cs / 3);
-        // 🛑 ลบ: labelFontSize ไม่ได้ใช้แล้ว
+        // 🛑 ลบ: การคำนวณ Font Size สำหรับ Cost ไม่จำเป็นแล้ว
+        // int costFontSize = Math.max(8, cs / 3);
 
         // 1. วาด Maze Grid
         for (int r = 0; r < rows; r++) {
@@ -63,19 +62,19 @@ public class MazePanel extends JPanel {
                 
                 // 1.1 วาดพื้นหลัง (สีตาม Cost)
                 if (cost == MazeLoader.WALL) {
-                    g2d.setColor(Color.BLACK); 
+                    g2d.setColor(Color.BLACK); // กำแพง
                 } else {
-                    float hue = (10 - (float) cost) / 10.0f * 0.35f; 
-                    g2d.setColor(Color.getHSBColor(hue, 0.4f, 0.9f));
+                    // 🛑 แก้ไข: ปรับสีให้เป็นเขียวอ่อน (Cost 1) ไปเขียวเข้ม (Cost 10)
+                    // HSB: Hue = 0.35f (เขียว), Saturation (สีเข้มขึ้นเมื่อ Cost เพิ่ม), Brightness (สีเข้มขึ้นเมื่อ Cost เพิ่ม)
+                    // Cost 1: Sat=0.1, Bright=0.8 (อ่อน)
+                    // Cost 10: Sat=0.9, Bright=0.4 (เข้ม)
+                    float saturation = 0.1f + (float) cost / 10.0f * 0.8f; 
+                    float brightness = 0.8f - (float) cost / 10.0f * 0.4f; 
+                    g2d.setColor(Color.getHSBColor(0.35f, saturation, brightness));
                 }
                 g2d.fillRect(c * cs, r * cs, cs, cs); 
 
-                // 1.2 วาด Cost Text
-                if (cost != MazeLoader.WALL) {
-                    g2d.setColor(Color.BLACK);
-                    g2d.setFont(new Font("Arial", Font.PLAIN, costFontSize)); 
-                    g2d.drawString(String.valueOf(cost), c * cs + (int)(cs * 0.1), r * cs + (int)(cs * 0.7)); 
-                }
+                // 🛑 ลบ: 1.2 วาด Cost Text ออกไป
                 
                 // 1.3 วาด Grid Lines
                 g2d.setColor(Color.GRAY);
@@ -96,11 +95,10 @@ public class MazePanel extends JPanel {
             g2d.drawRect(coord.c() * cs, coord.r() * cs, cs, cs);
         }
 
-        // 3. วาด Start (S) และ Goal (G)
-        // 🛑 แก้ไข: วาดเป็นสีเหลืองเต็มช่อง ไม่มีตัวอักษรหรือตัวเลขใด ๆ
+        // 3. วาด Start (S) และ Goal (G) เป็นสีเหลืองเต็มช่อง
         
         // Start (S)
-        g2d.setColor(Color.YELLOW); // ใช้สีเหลืองที่สว่างที่สุด
+        g2d.setColor(Color.YELLOW); 
         g2d.fillRect(info.start().c() * cs, info.start().r() * cs, cs, cs);
         
         // วาดเส้น Grid ทับ Start
@@ -108,7 +106,7 @@ public class MazePanel extends JPanel {
         g2d.drawRect(info.start().c() * cs, info.start().r() * cs, cs, cs);
 
         // Goal (G)
-        g2d.setColor(Color.YELLOW); // ใช้สีเหลืองที่สว่างที่สุด
+        g2d.setColor(Color.YELLOW); 
         g2d.fillRect(info.end().c() * cs, info.end().r() * cs, cs, cs);
         
         // วาดเส้น Grid ทับ Goal

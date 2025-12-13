@@ -5,6 +5,7 @@ package cpe231.maze;
 import java.awt.*;
 import java.io.IOException;
 import javax.swing.*;
+import javax.swing.border.TitledBorder;
 
 public class VisualizationApp {
 
@@ -59,7 +60,7 @@ public class VisualizationApp {
         // 5.2 เพิ่ม Summary Text (ผลลัพธ์ตัวเลข)
         JTextArea summary = new JTextArea(4, 25); 
         summary.setEditable(false);
-        summary.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        summary.setFont(new Font("Ubuntu", Font.PLAIN, 16));
         
         // (โค้ดส่วนนี้เหมือนเดิม) ...
         if (result.totalCost != -1) {
@@ -74,8 +75,15 @@ public class VisualizationApp {
              summary.setText("Algorithm: " + result.algoName + "\nPath Not Found.");
         }
         
-        // จัด Border ให้สวยงาม
-        panel.setBorder(BorderFactory.createTitledBorder(result.algoName));
+        // 1. สร้าง TitledBorder
+        TitledBorder titleBorder = BorderFactory.createTitledBorder(result.algoName);
+        
+        // 2. ตั้งค่าฟอนต์และขนาดของ Titled Border
+        // ตัวอย่าง: ใช้ฟอนต์ SansSerif (หรือ Arial) เป็นตัวหนา ขนาด 16
+        titleBorder.setTitleFont(new Font("Cascadia Code", Font.BOLD, 18)); 
+        
+        // 3. กำหนด Border ให้กับ Panel
+        panel.setBorder(titleBorder);
         
         // 🛑 NEW: ใช้ GridBagConstraints ในการจัดวาง
         GridBagConstraints gbc = new GridBagConstraints();
