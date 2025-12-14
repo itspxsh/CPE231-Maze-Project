@@ -2,23 +2,23 @@ package cpe231.maze;
 
 import java.util.*;
 
-public class AStar {
-    private static class Node implements Comparable<Node> {
-        int index, g, f, h;
-        public Node(int index, int g, int h) {
-            this.index = index; this.g = g; this.h = h; this.f = g + h;
+public class AStarSolver implements MazeSolver {
+
+    private class Node implements Comparable<Node> {
+        int index, g, f;
+        public Node(int index, int g, int f) {
+            this.index = index; this.g = g; this.f = f;
         }
-        public int compareTo(Node o) {
-            return (this.f == o.f) ? Integer.compare(this.h, o.h) : Integer.compare(this.f, o.f);
-        }
+        public int compareTo(Node o) { return Integer.compare(this.f, o.f); }
     }
 
-    public static AlgorithmResult solve(int[][] maze) {
+    @Override
+    public AlgorithmResult solve(MazeContext context) {
         long start = System.nanoTime();
-        long nodesExp = 0;
-        int rows = maze.length, cols = maze[0].length;
-        int startIdx = MazeLoader.startRow * cols + MazeLoader.startCol;
-        int endIdx = MazeLoader.endRow * cols + MazeLoader.endCol;
+        int rows = context.rows, cols = context.cols;
+        int startIdx = context.getStartIndex();
+        int endIdx = context.getEndIndex();
+        int[][] maze = context.getGrid();
 
         PriorityQueue<Node> open = new PriorityQueue<>();
         int[] gScore = new int[rows * cols];
@@ -27,14 +27,17 @@ public class AStar {
         Arrays.fill(parent, -1);
 
         gScore[startIdx] = 0;
-        open.add(new Node(startIdx, 0, manhattan(MazeLoader.startRow, MazeLoader.startCol, MazeLoader.endRow, MazeLoader.endCol)));
+        open.add(new Node(startIdx, 0, manhattan(context.startRow, context.startCol, context.endRow, context.endCol)));
+
+        long nodesExp = 0;
 
         while (!open.isEmpty()) {
             Node current = open.poll();
             nodesExp++;
+
             if (current.g > gScore[current.index]) continue;
             if (current.index == endIdx) {
-                return new AlgorithmResult("A* Search", reconstruct(parent, rows, cols, endIdx), current.g, System.nanoTime() - start, nodesExp);
+                return new AlgorithmResult("A* Search", reconstruct(parent, cols, endIdx), current.g, System.nanoTime() - start, nodesExp);
             }
 
             int r = current.index / cols, c = current.index % cols;
@@ -48,7 +51,7 @@ public class AStar {
                     if (newG < gScore[nIdx]) {
                         gScore[nIdx] = newG;
                         parent[nIdx] = current.index;
-                        open.add(new Node(nIdx, newG, manhattan(nr, nc, MazeLoader.endRow, MazeLoader.endCol)));
+                        open.add(new Node(nIdx, newG, newG + manhattan(nr, nc, context.endRow, context.endCol)));
                     }
                 }
             }
@@ -56,8 +59,9 @@ public class AStar {
         return new AlgorithmResult("A* Search", new ArrayList<>(), -1, System.nanoTime() - start, nodesExp);
     }
 
-    private static int manhattan(int r, int c, int er, int ec) { return Math.abs(r - er) + Math.abs(c - ec); }
-    private static List<int[]> reconstruct(int[] parent, int rows, int cols, int curr) {
+    private int manhattan(int r, int c, int er, int ec) { return Math.abs(r - er) + Math.abs(c - ec); }
+    
+    private List<int[]> reconstruct(int[] parent, int cols, int curr) {
         List<int[]> path = new ArrayList<>();
         while (curr != -1) { path.add(new int[]{curr / cols, curr % cols}); curr = parent[curr]; }
         Collections.reverse(path);
