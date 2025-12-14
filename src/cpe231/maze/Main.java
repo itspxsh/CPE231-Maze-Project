@@ -20,12 +20,11 @@ public class Main {
             System.out.println("Grid Size: " + maze.rows + "x" + maze.cols);
             System.out.println();
             
-            // ใส่ครบ 4 ตัวเทพเลยครับ
             MazeSolver[] solvers = {
-                new DijkstraSolver(),               // Baseline 1 (Optimal)
-                new AStarSolver(),                  // Baseline 2 (Optimal & Fast)
-                new GeneticSolverPure(),            // ของคุณ (Pure GA)
-                new GeneticSolverUltimate()         // ของคุณแบบอัปเกรด (Hybrid/Memetic)
+                new DijkstraSolver(),
+                new AStarSolver(),
+                new GeneticSolverPure(),
+                new GeneticSolverAdaptive() // แก้ตรงนี้
             };
             
             AlgorithmResult optimalRes = null;
