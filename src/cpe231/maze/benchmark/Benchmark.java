@@ -13,6 +13,10 @@ import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+/**
+ * Professional benchmark suite with averaged results over multiple runs.
+ * Tests all algorithms across all maze files and exports CSV results.
+ */
 public class Benchmark {
     
     private static JDialog benchmarkDialog = null;
@@ -21,8 +25,7 @@ public class Benchmark {
     private static JProgressBar progressBar;
     private static JButton exportButton;
     
-    // Number of times to run each algorithm for averaging
-    private static final int ITERATIONS = 10;
+    private static final int ITERATIONS = 10; // Average over 10 runs
     
     private static final Color PRIMARY_BG = new Color(240, 242, 245);
     private static final Color ACCENT_COLOR = new Color(37, 99, 235);
@@ -49,7 +52,6 @@ public class Benchmark {
         benchmarkDialog.setLocationRelativeTo(null);
         benchmarkDialog.getContentPane().setBackground(PRIMARY_BG);
         
-        // Enhanced Header Panel
         JPanel headerPanel = new JPanel(new BorderLayout());
         headerPanel.setBackground(new Color(31, 41, 55));
         headerPanel.setBorder(new EmptyBorder(20, 24, 20, 24));
@@ -72,7 +74,6 @@ public class Benchmark {
         
         benchmarkDialog.add(headerPanel, BorderLayout.NORTH);
         
-        // Enhanced Table setup
         String[] columns = {"Map", "Algorithm", "Status", "Avg Time (ms)", "Avg Cost", "Avg Nodes", "Avg Path"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
@@ -90,7 +91,6 @@ public class Benchmark {
         resultTable.setSelectionForeground(Color.BLACK);
         resultTable.setAutoCreateRowSorter(true);
         
-        // Styled table header
         JTableHeader header = resultTable.getTableHeader();
         header.setFont(new Font("Segoe UI", Font.BOLD, 12));
         header.setBackground(new Color(249, 250, 251));
@@ -98,7 +98,6 @@ public class Benchmark {
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, new Color(229, 231, 235)));
         header.setPreferredSize(new Dimension(header.getPreferredSize().width, 40));
         
-        // Column widths
         resultTable.getColumnModel().getColumn(0).setPreferredWidth(130);
         resultTable.getColumnModel().getColumn(1).setPreferredWidth(150);
         resultTable.getColumnModel().getColumn(2).setPreferredWidth(90);
@@ -107,7 +106,6 @@ public class Benchmark {
         resultTable.getColumnModel().getColumn(5).setPreferredWidth(110);
         resultTable.getColumnModel().getColumn(6).setPreferredWidth(110);
         
-        // Enhanced status column renderer
         resultTable.getColumnModel().getColumn(2).setCellRenderer(new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable table, Object value,
@@ -129,7 +127,6 @@ public class Benchmark {
                     }
                 }
                 
-                // Alternating row colors
                 if (!isSelected) {
                     if (row % 2 == 0) {
                         setBackground(Color.WHITE);
@@ -141,7 +138,6 @@ public class Benchmark {
             }
         });
         
-        // Enhanced cell renderer for other columns
         DefaultTableCellRenderer cellRenderer = new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable table, Object value,
@@ -158,7 +154,6 @@ public class Benchmark {
                 
                 setForeground(new Color(31, 41, 55));
                 
-                // Center align numeric columns
                 if (column >= 3) {
                     setHorizontalAlignment(SwingConstants.CENTER);
                     setFont(new Font("Segoe UI", Font.BOLD, 12));
@@ -172,7 +167,7 @@ public class Benchmark {
         };
         
         for (int i = 0; i < 7; i++) {
-            if (i != 2) { // Skip status column
+            if (i != 2) {
                 resultTable.getColumnModel().getColumn(i).setCellRenderer(cellRenderer);
             }
         }
@@ -182,16 +177,13 @@ public class Benchmark {
         scrollPane.getViewport().setBackground(Color.WHITE);
         benchmarkDialog.add(scrollPane, BorderLayout.CENTER);
         
-        // Enhanced Bottom panel
         JPanel bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.setBackground(Color.WHITE);
         bottomPanel.setBorder(new EmptyBorder(12, 16, 16, 16));
         
-        // Progress section
         JPanel progressSection = new JPanel(new BorderLayout());
         progressSection.setBackground(Color.WHITE);
         
-        // Styled progress bar
         progressBar = new JProgressBar();
         progressBar.setStringPainted(true);
         progressBar.setFont(new Font("Segoe UI", Font.BOLD, 11));
@@ -211,7 +203,6 @@ public class Benchmark {
         progressSection.add(progressWrapper, BorderLayout.CENTER);
         bottomPanel.add(progressSection, BorderLayout.NORTH);
         
-        // Button panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
         buttonPanel.setBackground(Color.WHITE);
         
@@ -290,13 +281,10 @@ public class Benchmark {
                 MazeSolver[] solvers = {
                     new AStarSolver(),
                     new DijkstraSolver(),
-                    // new GeneticSolverPureV1(),
-                    // new GeneticSolver(),
-                    // new GeneticSolverV10(), // Added your new Adaptive solver here
-                    new GeneticSolverAdaptive()
+                    new PureGASolver(),
+                    new HybridGASolver()
                 };
 
-                // Total steps = Files * Solvers (we process 10 runs internally as one step)
                 int totalSteps = files.length * solvers.length;
                 int stepCount = 0;
                 
@@ -315,7 +303,6 @@ public class Benchmark {
                         
                         for (MazeSolver solver : solvers) {
                             
-                            // --- Averaging Logic Variables ---
                             double totalTime = 0;
                             long totalCost = 0;
                             long totalNodes = 0;
@@ -324,11 +311,9 @@ public class Benchmark {
                             
                             String algoName = solver.getClass().getSimpleName()
                                     .replace("Solver", "")
-                                    .replace("Pure", "");
+                                    .replace("V10", "");
 
-                            // Run 10 times
                             for (int i = 0; i < ITERATIONS; i++) {
-                                // IMPORTANT: Create a fresh Context for every run to ensure no shared state
                                 MazeContext ctx = new MazeContext(
                                     MazeLoader.maze, 
                                     MazeLoader.startRow, MazeLoader.startCol, 
@@ -345,11 +330,10 @@ public class Benchmark {
                                         successfulRuns++;
                                     }
                                 } catch (Exception e) {
-                                    // Siently fail individual runs or log if needed
+                                    System.err.println("  Run " + (i+1) + " failed: " + e.getMessage());
                                 }
                             }
                             
-                            // Calculate Averages
                             final Object[] rowData;
                             if (successfulRuns > 0) {
                                 double avgTime = totalTime / successfulRuns;
@@ -383,8 +367,7 @@ public class Benchmark {
                                     currentStep, totalSteps, file.getName()));
                             });
                             
-                            // Tiny delay to keep UI responsive
-                            Thread.sleep(20); 
+                            Thread.sleep(20);
                         }
                         
                     } catch (Exception e) {
@@ -428,19 +411,16 @@ public class Benchmark {
             File fileToSave = fileChooser.getSelectedFile();
             
             try (PrintWriter writer = new PrintWriter(fileToSave)) {
-                // CSV Header
                 writer.println("Map,Algorithm,Status,Avg_Time_ms,Avg_Cost,Avg_Nodes_Expanded,Avg_Path_Length");
                 
                 for (int i = 0; i < tableModel.getRowCount(); i++) {
                     for (int j = 0; j < tableModel.getColumnCount(); j++) {
                         Object value = tableModel.getValueAt(i, j);
-                        // Clean up strings for CSV (remove formatting commas/status text)
                         String strValue = value != null ? value.toString() : "";
-                        strValue = strValue.replace(",", ""); // Remove thousand separators
+                        strValue = strValue.replace(",", "");
                         
-                        // Keep success status clean in CSV
                         if (j == 2 && strValue.contains("SUCCESS")) {
-                            strValue = "SUCCESS"; 
+                            strValue = "SUCCESS";
                         }
                         
                         writer.print(strValue);

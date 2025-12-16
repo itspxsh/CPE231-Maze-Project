@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class VisualizationApp extends JFrame {
 
@@ -25,13 +26,15 @@ public class VisualizationApp extends JFrame {
     private JButton btnLoad;
     private JButton btnCancel;
 
-    // Enhanced color palette
+    // Synchronization barriers
+    private AlgorithmResult[] resultsBuffer;
+    private AtomicInteger completedCount;
+
+    // Colors
     private static final Color PRIMARY_BG = new Color(240, 242, 245);
     private static final Color CONTROL_BG = new Color(255, 255, 255);
     private static final Color ACCENT_COLOR = new Color(37, 99, 235);
-    private static final Color SUCCESS_COLOR = new Color(16, 185, 129);
     private static final Color ERROR_COLOR = new Color(239, 68, 68);
-    private static final Color HOVER_COLOR = new Color(59, 130, 246);
 
     public VisualizationApp() {
         setTitle("CPE231 Maze Pathfinding - Algorithm Comparison");
@@ -39,19 +42,11 @@ public class VisualizationApp extends JFrame {
         setLayout(new BorderLayout());
         getContentPane().setBackground(PRIMARY_BG);
 
-        // Control Panel
-        JPanel controlPanel = createControlPanel();
-        add(controlPanel, BorderLayout.NORTH);
+        add(createControlPanel(), BorderLayout.NORTH);
+        add(createVisualizationGrid(), BorderLayout.CENTER);
+        add(createFooter(), BorderLayout.SOUTH);
 
-        // Visualization Grid
-        JPanel gridPanel = createVisualizationGrid();
-        add(gridPanel, BorderLayout.CENTER);
-
-        // Footer with info
-        JPanel footerPanel = createFooter();
-        add(footerPanel, BorderLayout.SOUTH);
-
-        setSize(1500, 850);
+        setSize(1400, 800);
         setLocationRelativeTo(null);
     }
 
@@ -66,12 +61,12 @@ public class VisualizationApp extends JFrame {
         JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 5));
         leftPanel.setBackground(CONTROL_BG);
 
-        // Map selection with enhanced styling
         JLabel lblMap = new JLabel("Maze File:");
         lblMap.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        lblMap.setForeground(new Color(31, 41, 55));
         
         File dataDir = new File("data");
+        if (!dataDir.exists()) dataDir.mkdir();
+        
         String[] files = dataDir.list((dir, name) -> name.endsWith(".txt"));
         
         if (files != null) {
@@ -82,12 +77,10 @@ public class VisualizationApp extends JFrame {
             });
         }
         
-        fileSelector = new JComboBox<>(files != null ? files : new String[]{"No files"});
+        fileSelector = new JComboBox<>(files != null && files.length > 0 ? files : new String[]{"No files"});
         fileSelector.setPreferredSize(new Dimension(180, 36));
-        fileSelector.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         fileSelector.setBackground(Color.WHITE);
         
-        // Enhanced control buttons
         btnLoad = createStyledButton("▶  Load & Run", ACCENT_COLOR);
         btnLoad.addActionListener(e -> startDemo());
         
@@ -100,28 +93,22 @@ public class VisualizationApp extends JFrame {
         leftPanel.add(btnLoad);
         leftPanel.add(btnCancel);
 
-        // Speed controls with better styling
         JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 5));
         rightPanel.setBackground(CONTROL_BG);
 
         JLabel lblSpeed = new JLabel("Animation Speed:");
         lblSpeed.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        lblSpeed.setForeground(new Color(31, 41, 55));
         
         JSlider speedSlider = new JSlider(0, 100, 20);
-        speedSlider.setInverted(true);
+        speedSlider.setInverted(true); 
         speedSlider.setPreferredSize(new Dimension(120, 36));
         speedSlider.setBackground(CONTROL_BG);
-        speedSlider.setOpaque(true);
         speedSlider.addChangeListener(e -> {
-            if (!skipAnimationCheck.isSelected()) {
-                delay = speedSlider.getValue();
-            }
+            if (!skipAnimationCheck.isSelected()) delay = speedSlider.getValue();
         });
         
         skipAnimationCheck = new JCheckBox("Skip Animation");
         skipAnimationCheck.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        skipAnimationCheck.setForeground(new Color(55, 65, 81));
         skipAnimationCheck.setBackground(CONTROL_BG);
         skipAnimationCheck.setFocusPainted(false);
         skipAnimationCheck.addActionListener(e -> {
@@ -129,7 +116,15 @@ public class VisualizationApp extends JFrame {
         });
 
         JButton btnBenchmark = createStyledButton("≡  Run Benchmark", new Color(139, 92, 246));
-        btnBenchmark.addActionListener(e -> runBenchmark());
+        btnBenchmark.addActionListener(e -> {
+            try {
+                Class.forName("cpe231.maze.benchmark.Benchmark")
+                     .getMethod("runBenchmarkSuite")
+                     .invoke(null);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Benchmark module not found.");
+            }
+        });
 
         rightPanel.add(lblSpeed);
         rightPanel.add(speedSlider);
@@ -151,44 +146,37 @@ public class VisualizationApp extends JFrame {
         button.setBorderPainted(false);
         button.setOpaque(true);
         button.setPreferredSize(new Dimension(150, 36));
-        button.setMinimumSize(new Dimension(150, 36));
-        button.setMaximumSize(new Dimension(150, 36));
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
         
-        // Add hover effect
         button.addMouseListener(new java.awt.event.MouseAdapter() {
             Color originalColor = baseColor;
             public void mouseEntered(java.awt.event.MouseEvent evt) {
-                if (button.isEnabled()) {
-                    button.setBackground(baseColor.brighter());
-                }
+                if (button.isEnabled()) button.setBackground(baseColor.brighter());
             }
             public void mouseExited(java.awt.event.MouseEvent evt) {
                 button.setBackground(originalColor);
             }
         });
-        
         return button;
     }
 
     private JPanel createVisualizationGrid() {
-        JPanel gridPanel = new JPanel(new GridLayout(1, 4, 16, 0));
+        JPanel gridPanel = new JPanel(new GridLayout(1, 3, 16, 0));
         gridPanel.setBackground(PRIMARY_BG);
         gridPanel.setBorder(new EmptyBorder(16, 16, 8, 16));
         
-        panels = new MazePanel[4];
-        statusLabels = new JLabel[4];
+        panels = new MazePanel[3];
+        statusLabels = new JLabel[3];
         
-        String[] headers = {"A* (Manhattan)", "Dijkstra", "Genetic Algorithm", "Memetic Algorithm"};
-        String[] descriptions = {"Optimal path with heuristic", "Guaranteed shortest path", "Evolutionary optimization", "Hybrid local search"};
+        String[] headers = {"A* (Manhattan)", "Dijkstra", "Pure Genetic Algo"};
+        String[] descriptions = {"Optimal path with heuristic", "Guaranteed shortest path", "Natural Selection Evolution"};
         Color[] headerColors = {
-            new Color(37, 99, 235),    // Blue
-            new Color(139, 92, 246),   // Purple
-            new Color(234, 179, 8),    // Yellow
-            new Color(249, 115, 22)    // Orange
+            new Color(37, 99, 235),
+            new Color(139, 92, 246),
+            new Color(234, 179, 8)
         };
         
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 3; i++) {
             JPanel container = new JPanel(new BorderLayout());
             container.setBackground(Color.WHITE);
             container.setBorder(BorderFactory.createCompoundBorder(
@@ -196,7 +184,6 @@ public class VisualizationApp extends JFrame {
                 BorderFactory.createEmptyBorder(0, 0, 0, 0)
             ));
             
-            // Enhanced header with gradient-like appearance
             JPanel headerPanel = new JPanel(new BorderLayout());
             headerPanel.setBackground(headerColors[i]);
             headerPanel.setBorder(new EmptyBorder(14, 12, 14, 12));
@@ -218,7 +205,6 @@ public class VisualizationApp extends JFrame {
             
             panels[i] = new MazePanel();
             
-            // Enhanced status panel with metrics
             statusLabels[i] = new JLabel("<html><div style='text-align:center; padding:8px;'>" +
                 "<span style='color:#6B7280; font-size:12px;'>Ready to solve</span></div></html>");
             statusLabels[i].setFont(new Font("Segoe UI", Font.PLAIN, 12));
@@ -235,7 +221,6 @@ public class VisualizationApp extends JFrame {
             container.add(statusLabels[i], BorderLayout.SOUTH);
             gridPanel.add(container);
         }
-        
         return gridPanel;
     }
 
@@ -243,24 +228,16 @@ public class VisualizationApp extends JFrame {
         JPanel footer = new JPanel(new BorderLayout());
         footer.setBackground(new Color(31, 41, 55));
         footer.setBorder(new EmptyBorder(12, 20, 12, 20));
-        
         JLabel footerText = new JLabel("CPE231 Maze Solver • Algorithm Performance Comparison Tool");
         footerText.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         footerText.setForeground(new Color(156, 163, 175));
-        
-        JLabel versionText = new JLabel("Version 1.0");
-        versionText.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        versionText.setForeground(new Color(107, 114, 128));
-        
         footer.add(footerText, BorderLayout.WEST);
-        footer.add(versionText, BorderLayout.EAST);
-        
         return footer;
     }
 
     public void runDemo() {
         setVisible(true);
-        if (fileSelector.getItemCount() > 0) {
+        if (fileSelector.getItemCount() > 0 && !fileSelector.getItemAt(0).equals("No files")) {
             loadMap((String) fileSelector.getSelectedItem());
         }
     }
@@ -280,35 +257,44 @@ public class VisualizationApp extends JFrame {
                 p.repaint();
             }
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, 
-                "Failed to load maze: " + e.getMessage(),
-                "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Failed to load: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
+    // =========================================================================
+    // PHASE 1: START PARALLEL COMPUTATIONS
+    // =========================================================================
     private void startDemo() {
         if (isRunning.get()) return;
         loadMap((String) fileSelector.getSelectedItem());
         if (currentContext == null) return;
         
         isRunning.set(true);
+        
+        // Lock UI
         btnLoad.setEnabled(false);
         btnCancel.setEnabled(true);
         fileSelector.setEnabled(false);
         
+        // Prepare Synchronization
+        resultsBuffer = new AlgorithmResult[3];
+        completedCount = new AtomicInteger(0);
+        
         MazeSolver[] solvers = {
             new AStarSolver(),
             new DijkstraSolver(),
-            new GeneticSolverV10(),
-            new GeneticSolverAdaptive()
+            new PureGASolver(),
         };
 
-        for (int i = 0; i < 4; i++) {
+        // Launch 3 Silent Workers
+        for (int i = 0; i < 3; i++) {
             statusLabels[i].setText("<html><div style='text-align:center; padding:8px;'>" +
-                "<span style='color:#F59E0B; font-weight:bold; font-size:13px;'>● Processing...</span><br>" +
-                "<span style='color:#9CA3AF; font-size:11px;'>Computing optimal path</span></div></html>");
+                "<span style='color:#3B82F6; font-weight:bold; font-size:13px;'>● Calculating...</span><br>" +
+                "<span style='color:#9CA3AF; font-size:11px;'>Please wait</span></div></html>");
             panels[i].setPath(null);
-            new AlgorithmWorker(solvers[i], i).execute();
+            
+            // Start worker
+            new ComputationWorker(solvers[i], i).execute();
         }
     }
 
@@ -317,56 +303,136 @@ public class VisualizationApp extends JFrame {
         btnLoad.setEnabled(true);
         btnCancel.setEnabled(false);
         fileSelector.setEnabled(true);
-    }
-    
-    private void runBenchmark() {
-        new Thread(cpe231.maze.benchmark.Benchmark::runBenchmarkSuite).start();
+        // Reset labels
+        for(JLabel l : statusLabels) l.setText("<html><div style='text-align:center; padding:8px;'><span style='color:#6B7280'>Cancelled</span></div></html>");
     }
 
-    private class AlgorithmWorker extends SwingWorker<AlgorithmResult, List<int[]>> {
+    private int extractNumber(String s) {
+        String num = s.replaceAll("\\D", "");
+        return num.isEmpty() ? 0 : Integer.parseInt(num);
+    }
+
+    // =========================================================================
+    // WORKER 1: PURE COMPUTATION (Silent, Background)
+    // =========================================================================
+    private class ComputationWorker extends SwingWorker<AlgorithmResult, Void> {
         private final MazeSolver solver;
-        private final int panelIndex;
-        
-        AlgorithmWorker(MazeSolver solver, int panelIndex) {
+        private final int index;
+
+        ComputationWorker(MazeSolver solver, int index) {
             this.solver = solver;
-            this.panelIndex = panelIndex;
+            this.index = index;
         }
-        
+
         @Override
-        protected AlgorithmResult doInBackground() throws Exception {
-            Thread.sleep(panelIndex * 100); 
-            AlgorithmResult result = solver.solve(currentContext);
-            
-            if (!skipAnimationCheck.isSelected() && result.path() != null) {
-                List<int[]> animatedPath = new ArrayList<>();
-                for (int[] step : result.path()) {
-                    if (!isRunning.get()) break;
-                    animatedPath.add(step);
-                    publish(new ArrayList<>(animatedPath)); 
-                    Thread.sleep(Math.max(1, delay));
-                }
-            }
-            return result;
+        protected AlgorithmResult doInBackground() {
+            // NOTE: calling solve() directly (not solveWithProgress) suppresses 
+            // the GA evolution animation, keeping this phase strictly "Computing..."
+            return solver.solve(currentContext);
         }
-        
-        @Override
-        protected void process(List<List<int[]>> chunks) {
-            if (isRunning.get() && !chunks.isEmpty()) {
-                panels[panelIndex].setPath(chunks.get(chunks.size() - 1));
-            }
-        }
-        
+
         @Override
         protected void done() {
+            if (!isRunning.get()) return;
             try {
-                AlgorithmResult result = get();
-                panels[panelIndex].setPath(result.path());
+                // 1. Store Result
+                resultsBuffer[index] = get();
                 
+                // 2. Check if all 3 are ready
+                if (completedCount.incrementAndGet() == 3) {
+                    startSynchronizedAnimation();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    // =========================================================================
+    // WORKER 2: SYNCHRONIZED ANIMATION (Single Driver for All Panels)
+    // =========================================================================
+    private void startSynchronizedAnimation() {
+        if (!isRunning.get()) return;
+        
+        // Update Status to "Animating"
+        for (int i = 0; i < 3; i++) {
+            statusLabels[i].setText("<html><div style='text-align:center; padding:8px;'>" +
+                "<span style='color:#8B5CF6; font-weight:bold; font-size:13px;'>▶ Animating</span><br>" +
+                "<span style='color:#9CA3AF; font-size:11px;'>Visualizing Path</span></div></html>");
+        }
+        
+        new SyncedAnimationWorker().execute();
+    }
+
+    private class SyncedAnimationWorker extends SwingWorker<Void, Integer> {
+        
+        @Override
+        protected Void doInBackground() throws Exception {
+            // Find longest path to know when to stop loop
+            int maxSteps = 0;
+            for (AlgorithmResult res : resultsBuffer) {
+                if (res != null && res.path() != null) {
+                    maxSteps = Math.max(maxSteps, res.path().size());
+                }
+            }
+
+            // Quick skip if requested
+            if (skipAnimationCheck.isSelected()) {
+                publish(maxSteps); 
+                return null;
+            }
+
+            // Small pause before action starts
+            Thread.sleep(300);
+
+            // Frame-by-frame loop
+            for (int step = 0; step <= maxSteps; step++) {
+                if (!isRunning.get()) break;
+                
+                publish(step);
+                
+                if (delay > 0) {
+                    Thread.sleep(delay);
+                }
+            }
+            return null;
+        }
+
+        @Override
+        protected void process(List<Integer> steps) {
+            if (!isRunning.get()) return;
+            int currentStep = steps.get(steps.size() - 1); // Get latest frame
+
+            // Update all 3 panels to this frame
+            for (int i = 0; i < 3; i++) {
+                AlgorithmResult res = resultsBuffer[i];
+                if (res != null && res.isSuccess()) {
+                    List<int[]> fullPath = res.path();
+                    int limit = Math.min(currentStep, fullPath.size());
+                    // Create sublist for animation effect
+                    panels[i].setPath(fullPath.subList(0, limit));
+                }
+            }
+        }
+
+        @Override
+        protected void done() {
+            // Finalize: Show stats and ensure full paths are drawn
+            for (int i = 0; i < 3; i++) {
+                AlgorithmResult result = resultsBuffer[i];
+                if (result == null) continue;
+
+                // Ensure full path is drawn
+                if (result.path() != null) {
+                    panels[i].setPath(result.path());
+                }
+
+                // Show Stats
                 String statusColor = result.isSuccess() ? "#10B981" : "#EF4444";
                 String statusIcon = result.isSuccess() ? "✓" : "✗";
                 String statusText = result.isSuccess() ? "SUCCESS" : "FAILED";
                 
-                statusLabels[panelIndex].setText(String.format(
+                statusLabels[i].setText(String.format(
                     "<html><div style='text-align:center; padding:8px;'>" +
                     "<div style='color:%s; font-weight:bold; font-size:14px; margin-bottom:6px;'>%s %s</div>" +
                     "<div style='background:#F9FAFB; padding:8px; border-radius:4px; margin:4px 0;'>" +
@@ -376,29 +442,16 @@ public class VisualizationApp extends JFrame {
                     "<tr><td style='color:#6B7280; text-align:left;'>Explored:</td><td style='color:#111827; text-align:right; font-weight:bold;'>%,d nodes</td></tr>" +
                     "</table></div></div></html>",
                     statusColor, statusIcon, statusText, result.cost(), result.getDurationMs(), result.nodesExpanded()));
-            } catch (Exception e) {
-                statusLabels[panelIndex].setText(
-                    "<html><div style='text-align:center; color:#EF4444; font-weight:bold; padding:8px;'>✗ ERROR</div></html>");
-                e.printStackTrace();
-            } finally {
-                checkAllComplete();
             }
+            
+            checkAllComplete();
         }
     }
-
+    
     private synchronized void checkAllComplete() {
-        javax.swing.Timer timer = new javax.swing.Timer(500, e -> {
-            btnLoad.setEnabled(true);
-            btnCancel.setEnabled(false);
-            fileSelector.setEnabled(true);
-            isRunning.set(false);
-        });
-        timer.setRepeats(false);
-        timer.start();
-    }
-
-    private int extractNumber(String s) {
-        String num = s.replaceAll("\\D", "");
-        return num.isEmpty() ? 0 : Integer.parseInt(num);
+        btnLoad.setEnabled(true);
+        btnCancel.setEnabled(false);
+        fileSelector.setEnabled(true);
+        isRunning.set(false);
     }
 }
