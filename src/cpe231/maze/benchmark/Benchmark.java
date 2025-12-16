@@ -12,16 +12,17 @@ import java.awt.*;
 import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.List;
 
 public class Benchmark {
-    
     
     private static JDialog benchmarkDialog = null;
     private static JTable resultTable;
     private static DefaultTableModel tableModel;
     private static JProgressBar progressBar;
     private static JButton exportButton;
+    
+    // Number of times to run each algorithm for averaging
+    private static final int ITERATIONS = 10;
     
     private static final Color PRIMARY_BG = new Color(240, 242, 245);
     private static final Color ACCENT_COLOR = new Color(37, 99, 235);
@@ -31,8 +32,6 @@ public class Benchmark {
     public static void main(String[] args) {
         Benchmark.runBenchmarkSuite();
     }
-
-
     
     public static void runBenchmarkSuite() {
         if (benchmarkDialog == null) {
@@ -44,7 +43,7 @@ public class Benchmark {
     }
     
     private static void createBenchmarkDialog() {
-        benchmarkDialog = new JDialog((Frame)null, "Benchmark Results", false);
+        benchmarkDialog = new JDialog((Frame)null, "Benchmark Results (Average of " + ITERATIONS + " Runs)", false);
         benchmarkDialog.setLayout(new BorderLayout());
         benchmarkDialog.setSize(1100, 700);
         benchmarkDialog.setLocationRelativeTo(null);
@@ -62,7 +61,7 @@ public class Benchmark {
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 22));
         titleLabel.setForeground(Color.WHITE);
         
-        JLabel subtitleLabel = new JLabel("Comprehensive performance analysis across all test mazes");
+        JLabel subtitleLabel = new JLabel("Average performance over " + ITERATIONS + " runs per map");
         subtitleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         subtitleLabel.setForeground(new Color(156, 163, 175));
         
@@ -74,7 +73,7 @@ public class Benchmark {
         benchmarkDialog.add(headerPanel, BorderLayout.NORTH);
         
         // Enhanced Table setup
-        String[] columns = {"Map", "Algorithm", "Status", "Time (ms)", "Cost", "Nodes", "Path Length"};
+        String[] columns = {"Map", "Algorithm", "Status", "Avg Time (ms)", "Avg Cost", "Avg Nodes", "Avg Path"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -119,16 +118,14 @@ public class Benchmark {
                 
                 if (value != null) {
                     String status = value.toString();
-                    if ("SUCCESS".equals(status)) {
-                        setText("✓ SUCCESS");
+                    if (status.contains("SUCCESS")) {
+                        setText(status);
                         setForeground(SUCCESS_COLOR);
                         setFont(getFont().deriveFont(Font.BOLD));
-                    } else if ("ERROR".equals(status)) {
-                        setText("✗ ERROR");
+                    } else {
+                        setText(status);
                         setForeground(ERROR_COLOR);
                         setFont(getFont().deriveFont(Font.BOLD));
-                    } else {
-                        setForeground(new Color(107, 114, 128));
                     }
                 }
                 
@@ -140,7 +137,6 @@ public class Benchmark {
                         setBackground(new Color(249, 250, 251));
                     }
                 }
-                
                 return c;
             }
         });
@@ -219,7 +215,7 @@ public class Benchmark {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
         buttonPanel.setBackground(Color.WHITE);
         
-        exportButton = createStyledButton("↓ Export to CSV", SUCCESS_COLOR);
+        exportButton = createStyledButton("↓ Export CSV", SUCCESS_COLOR);
         exportButton.setEnabled(false);
         exportButton.addActionListener(e -> exportToCSV());
         
@@ -255,7 +251,6 @@ public class Benchmark {
         button.setMaximumSize(new Dimension(140, 34));
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
         
-        // Hover effect
         button.addMouseListener(new java.awt.event.MouseAdapter() {
             Color originalColor = color;
             public void mouseEntered(java.awt.event.MouseEvent evt) {
@@ -274,7 +269,7 @@ public class Benchmark {
     private static void runBenchmarkInBackground() {
         new Thread(() -> {
             try {
-                System.out.println("\n=== BENCHMARK STARTED ===");
+                System.out.println("\n=== BENCHMARK STARTED (Averaging " + ITERATIONS + " runs) ===");
                 
                 File folder = new File("data");
                 File[] files = folder.listFiles((d, name) -> name.endsWith(".txt"));
@@ -295,80 +290,101 @@ public class Benchmark {
                 MazeSolver[] solvers = {
                     new AStarSolver(),
                     new DijkstraSolver(),
-                    new GeneticSolverPureV1(),
-                    new GeneticSolver(),
-                    new GeneticSolverV10()
+                    // new GeneticSolverPureV1(),
+                    // new GeneticSolver(),
+                    // new GeneticSolverV10(), // Added your new Adaptive solver here
+                    new GeneticSolverAdaptive()
                 };
 
-                int totalTests = files.length * solvers.length;
-                int completed = 0;
+                // Total steps = Files * Solvers (we process 10 runs internally as one step)
+                int totalSteps = files.length * solvers.length;
+                int stepCount = 0;
                 
                 SwingUtilities.invokeLater(() -> {
-                    progressBar.setMaximum(totalTests);
+                    progressBar.setMaximum(totalSteps);
                     progressBar.setValue(0);
-                    progressBar.setString("Starting benchmark...");
+                    progressBar.setString("Starting average benchmark...");
                     tableModel.setRowCount(0);
                 });
 
                 for (File file : files) {
                     try {
                         MazeLoader.loadMaze(file.getPath());
-                        MazeContext ctx = new MazeContext(
-                            MazeLoader.maze, 
-                            MazeLoader.startRow, MazeLoader.startCol, 
-                            MazeLoader.endRow, MazeLoader.endCol
-                        );
                         
-                        System.out.println("Testing: " + file.getName());
+                        System.out.println("Benchmarking: " + file.getName());
                         
                         for (MazeSolver solver : solvers) {
-                            try {
-                                AlgorithmResult result = solver.solve(ctx);
-                                
-                                String algoName = solver.getClass().getSimpleName()
+                            
+                            // --- Averaging Logic Variables ---
+                            double totalTime = 0;
+                            long totalCost = 0;
+                            long totalNodes = 0;
+                            long totalPathLen = 0;
+                            int successfulRuns = 0;
+                            
+                            String algoName = solver.getClass().getSimpleName()
                                     .replace("Solver", "")
                                     .replace("Pure", "");
+
+                            // Run 10 times
+                            for (int i = 0; i < ITERATIONS; i++) {
+                                // IMPORTANT: Create a fresh Context for every run to ensure no shared state
+                                MazeContext ctx = new MazeContext(
+                                    MazeLoader.maze, 
+                                    MazeLoader.startRow, MazeLoader.startCol, 
+                                    MazeLoader.endRow, MazeLoader.endCol
+                                );
                                 
-                                Object[] rowData = {
+                                try {
+                                    AlgorithmResult result = solver.solve(ctx);
+                                    if (result.isSuccess()) {
+                                        totalTime += result.getDurationMs();
+                                        totalCost += result.cost();
+                                        totalNodes += result.nodesExpanded();
+                                        totalPathLen += result.path().size();
+                                        successfulRuns++;
+                                    }
+                                } catch (Exception e) {
+                                    // Siently fail individual runs or log if needed
+                                }
+                            }
+                            
+                            // Calculate Averages
+                            final Object[] rowData;
+                            if (successfulRuns > 0) {
+                                double avgTime = totalTime / successfulRuns;
+                                double avgCost = (double) totalCost / successfulRuns;
+                                double avgNodes = (double) totalNodes / successfulRuns;
+                                double avgPath = (double) totalPathLen / successfulRuns;
+                                
+                                rowData = new Object[]{
                                     file.getName(),
                                     algoName,
-                                    result.isSuccess() ? "SUCCESS" : "FAILED",
-                                    String.format("%.2f", result.getDurationMs()),
-                                    result.cost(),
-                                    String.format("%,d", result.nodesExpanded()),
-                                    result.path().size()
+                                    "SUCCESS (" + successfulRuns + "/" + ITERATIONS + ")",
+                                    String.format("%.2f", avgTime),
+                                    String.format("%.1f", avgCost),
+                                    String.format("%,.0f", avgNodes),
+                                    String.format("%.1f", avgPath)
                                 };
-                                
-                                final int progress = ++completed;
-                                SwingUtilities.invokeLater(() -> {
-                                    tableModel.addRow(rowData);
-                                    progressBar.setValue(progress);
-                                    progressBar.setString(String.format("Completed %d of %d tests (%.0f%%)", 
-                                        progress, totalTests, (progress * 100.0 / totalTests)));
-                                });
-                                
-                                Thread.sleep(50);
-                                
-                            } catch (Exception e) {
-                                System.err.println("Error testing " + 
-                                    solver.getClass().getSimpleName() + 
-                                    " on " + file.getName() + ": " + e.getMessage());
-                                
-                                final int progress = ++completed;
-                                SwingUtilities.invokeLater(() -> {
-                                    Object[] errorRow = {
-                                        file.getName(),
-                                        solver.getClass().getSimpleName(),
-                                        "ERROR",
-                                        "-",
-                                        "-",
-                                        "-",
-                                        "-"
-                                    };
-                                    tableModel.addRow(errorRow);
-                                    progressBar.setValue(progress);
-                                });
+                            } else {
+                                rowData = new Object[]{
+                                    file.getName(),
+                                    algoName,
+                                    "FAILED",
+                                    "-", "-", "-", "-"
+                                };
                             }
+
+                            final int currentStep = ++stepCount;
+                            SwingUtilities.invokeLater(() -> {
+                                tableModel.addRow(rowData);
+                                progressBar.setValue(currentStep);
+                                progressBar.setString(String.format("Processed %d/%d (Map: %s)", 
+                                    currentStep, totalSteps, file.getName()));
+                            });
+                            
+                            // Tiny delay to keep UI responsive
+                            Thread.sleep(20); 
                         }
                         
                     } catch (Exception e) {
@@ -377,28 +393,12 @@ public class Benchmark {
                 }
                 
                 SwingUtilities.invokeLater(() -> {
-                    progressBar.setString("✓ Benchmark Complete - " + tableModel.getRowCount() + " tests finished");
+                    progressBar.setString("✓ Average Benchmark Complete");
                     exportButton.setEnabled(true);
                     
-                    // Show completion dialog with stats
-                    int successCount = 0;
-                    for (int i = 0; i < tableModel.getRowCount(); i++) {
-                        if ("SUCCESS".equals(tableModel.getValueAt(i, 2))) {
-                            successCount++;
-                        }
-                    }
-                    
                     JOptionPane.showMessageDialog(benchmarkDialog, 
-                        String.format(
-                            "Benchmark completed successfully!\n\n" +
-                            "Total Tests: %d\n" +
-                            "Successful: %d\n" +
-                            "Failed: %d",
-                            tableModel.getRowCount(), 
-                            successCount, 
-                            tableModel.getRowCount() - successCount
-                        ), 
-                        "Benchmark Complete", 
+                        "Benchmark Suite Completed!\nResults are averaged over " + ITERATIONS + " runs.", 
+                        "Done", 
                         JOptionPane.INFORMATION_MESSAGE);
                 });
                 
@@ -408,7 +408,7 @@ public class Benchmark {
                 e.printStackTrace();
                 SwingUtilities.invokeLater(() -> {
                     JOptionPane.showMessageDialog(benchmarkDialog, 
-                        "Benchmark error: " + e.getMessage(), 
+                        "Critical Error: " + e.getMessage(), 
                         "Error", JOptionPane.ERROR_MESSAGE);
                 });
             }
@@ -417,10 +417,10 @@ public class Benchmark {
     
     private static void exportToCSV() {
         JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setDialogTitle("Save Benchmark Results");
+        fileChooser.setDialogTitle("Save Averaged Benchmark Results");
         
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        fileChooser.setSelectedFile(new File("benchmark_results_" + timestamp + ".csv"));
+        fileChooser.setSelectedFile(new File("benchmark_avg_results_" + timestamp + ".csv"));
         
         int userSelection = fileChooser.showSaveDialog(benchmarkDialog);
         
@@ -428,12 +428,21 @@ public class Benchmark {
             File fileToSave = fileChooser.getSelectedFile();
             
             try (PrintWriter writer = new PrintWriter(fileToSave)) {
-                writer.println("Map,Algorithm,Status,Time_ms,Cost,Nodes_Expanded,Path_Length");
+                // CSV Header
+                writer.println("Map,Algorithm,Status,Avg_Time_ms,Avg_Cost,Avg_Nodes_Expanded,Avg_Path_Length");
                 
                 for (int i = 0; i < tableModel.getRowCount(); i++) {
                     for (int j = 0; j < tableModel.getColumnCount(); j++) {
                         Object value = tableModel.getValueAt(i, j);
-                        String strValue = value != null ? value.toString().replace(",", "").replace("✓ ", "").replace("✗ ", "") : "";
+                        // Clean up strings for CSV (remove formatting commas/status text)
+                        String strValue = value != null ? value.toString() : "";
+                        strValue = strValue.replace(",", ""); // Remove thousand separators
+                        
+                        // Keep success status clean in CSV
+                        if (j == 2 && strValue.contains("SUCCESS")) {
+                            strValue = "SUCCESS"; 
+                        }
+                        
                         writer.print(strValue);
                         if (j < tableModel.getColumnCount() - 1) {
                             writer.print(",");
@@ -443,7 +452,7 @@ public class Benchmark {
                 }
                 
                 JOptionPane.showMessageDialog(benchmarkDialog, 
-                    "Results exported successfully!\n\nFile: " + fileToSave.getName() + "\nLocation: " + fileToSave.getParent(), 
+                    "Export Successful!\n" + fileToSave.getAbsolutePath(), 
                     "Export Complete", 
                     JOptionPane.INFORMATION_MESSAGE);
                 
