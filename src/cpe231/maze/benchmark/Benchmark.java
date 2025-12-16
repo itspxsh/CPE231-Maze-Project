@@ -297,7 +297,7 @@ public class Benchmark {
                     new DijkstraSolver(),
                     new GeneticSolverPureV1(),
                     new GeneticSolver(),
-                    new GeneticSolverV9()
+                    new GeneticSolverV10()
                 };
 
                 int totalTests = files.length * solvers.length;
