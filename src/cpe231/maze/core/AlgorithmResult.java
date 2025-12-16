@@ -3,8 +3,8 @@ package cpe231.maze.core;
 import java.util.List;
 
 /**
- * A Java Record to hold the result of an algorithm run.
- * Records automatically generate getters like .path(), .cost(), .status().
+ * Immutable record to hold algorithm results.
+ * Now includes helper methods for the UI and Benchmark.
  */
 public record AlgorithmResult(
     String status,
@@ -12,4 +12,18 @@ public record AlgorithmResult(
     int cost,
     long durationNs,
     long nodesExpanded
-) {}
+) {
+    /**
+     * Returns true if the algorithm successfully found the goal.
+     */
+    public boolean isSuccess() {
+        return "Success".equalsIgnoreCase(status);
+    }
+
+    /**
+     * Returns duration in milliseconds (formatted as double).
+     */
+    public double getDurationMs() {
+        return durationNs / 1_000_000.0;
+    }
+}

@@ -1,6 +1,4 @@
-// src/cpe231/maze/algorithms/AStarSolver.java
 package cpe231.maze.algorithms;
-
 import cpe231.maze.core.*;
 import java.util.*;
 
@@ -8,84 +6,58 @@ public class AStarSolver implements MazeSolver {
     @Override
     public AlgorithmResult solve(MazeContext context) {
         long startTime = System.nanoTime();
-        int rows = context.rows;
-        int cols = context.cols;
-        int startIdx = context.getStartIndex();
-        int endIdx = context.getEndIndex();
+        int rows = context.rows, cols = context.cols;
+        int start = context.startRow * cols + context.startCol;
+        int end = context.endRow * cols + context.endCol;
         int[][] grid = context.getGridDirect();
 
-        // Safety: If maze not loaded
-        if (grid == null || grid.length == 0) return new AlgorithmResult("Error", new ArrayList<>(), -1, 0, 0);
-
-        PriorityQueue<Node> pq = new PriorityQueue<>(Comparator.comparingInt(n -> n.f));
+        PriorityQueue<long[]> pq = new PriorityQueue<>(Comparator.comparingLong(a -> a[1]));
         int[] dist = new int[rows * cols];
         int[] parent = new int[rows * cols];
         Arrays.fill(dist, Integer.MAX_VALUE);
         Arrays.fill(parent, -1);
 
-        dist[startIdx] = 0;
-        pq.add(new Node(startIdx, 0 + heuristic(context, startIdx)));
+        dist[start] = 0;
+        pq.add(new long[]{start, heuristic(context.startRow, context.startCol, context.endRow, context.endCol)});
         
-        long nodesExpanded = 0;
+        long expanded = 0;
+        int[] dr = {-1, 1, 0, 0};
+        int[] dc = {0, 0, -1, 1};
 
         while (!pq.isEmpty()) {
-            Node current = pq.poll();
-            int u = current.id;
-            nodesExpanded++;
-
-            if (u == endIdx) {
-                return new AlgorithmResult(
-                    "Success", 
-                    reconstructPath(parent, u, cols), 
-                    dist[u], 
-                    System.nanoTime() - startTime, 
-                    nodesExpanded
-                );
-            }
-
-            if (current.f > dist[u] + heuristic(context, u)) continue;
-
-            int r = u / cols;
-            int c = u % cols;
+            long[] curr = pq.poll();
+            int u = (int)curr[0];
             
-            // Neighbors: Up, Down, Left, Right
-            int[] dr = {-1, 1, 0, 0};
-            int[] dc = {0, 0, -1, 1};
-
-            for (int i = 0; i < 4; i++) {
-                int nr = r + dr[i];
-                int nc = c + dc[i];
-                
-                if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc] != -1) {
-                    int v = nr * cols + nc;
-                    int weight = grid[nr][nc]; // Use cell cost (1 or higher)
-                    if (dist[u] + weight < dist[v]) {
-                        dist[v] = dist[u] + weight;
+            // CHANGE: Subtract goal tile cost to match the 1085 definition
+            if (u == end) {
+                int finalCost = dist[end] - grid[context.endRow][context.endCol];
+                return new AlgorithmResult("Success", getPath(parent, end, cols), finalCost, System.nanoTime()-startTime, expanded);
+            }
+            
+            int r = u/cols, c = u%cols;
+            if (curr[1] > dist[u] + heuristic(r, c, context.endRow, context.endCol)) continue;
+            
+            expanded++;
+            for(int i=0; i<4; i++) {
+                int nr = r+dr[i], nc = c+dc[i];
+                if(nr>=0 && nr<rows && nc>=0 && nc<cols && grid[nr][nc]!=-1) {
+                    int v = nr*cols+nc;
+                    int newDist = dist[u] + grid[nr][nc];
+                    if(newDist < dist[v]) {
+                        dist[v] = newDist;
                         parent[v] = u;
-                        pq.add(new Node(v, dist[v] + heuristic(context, v)));
+                        pq.add(new long[]{v, newDist + heuristic(nr, nc, context.endRow, context.endCol)});
                     }
                 }
             }
         }
-        
-        return new AlgorithmResult("Failed", new ArrayList<>(), -1, System.nanoTime() - startTime, nodesExpanded);
+        return new AlgorithmResult("Failed", new ArrayList<>(), -1, System.nanoTime()-startTime, expanded);
     }
-
-    private int heuristic(MazeContext ctx, int idx) {
-        int r = idx / ctx.cols;
-        int c = idx % ctx.cols;
-        return Math.abs(r - ctx.endRow) + Math.abs(c - ctx.endCol);
-    }
-
-    private List<int[]> reconstructPath(int[] parent, int curr, int cols) {
+    private int heuristic(int r1, int c1, int r2, int c2) { return Math.abs(r1-r2) + Math.abs(c1-c2); }
+    private List<int[]> getPath(int[] p, int end, int cols) {
         List<int[]> path = new ArrayList<>();
-        while (curr != -1) {
-            path.add(new int[]{curr / cols, curr % cols});
-            curr = parent[curr];
-        }
+        for(int c=end; c!=-1; c=p[c]) path.add(new int[]{c/cols, c%cols});
         Collections.reverse(path);
         return path;
     }
-
-    record Node(int id, int f) {}
 }

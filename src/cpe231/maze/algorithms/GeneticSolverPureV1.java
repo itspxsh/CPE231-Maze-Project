@@ -3,13 +3,14 @@ package cpe231.maze.algorithms;
 import cpe231.maze.core.*;
 import java.util.*;
 
-public class GeneticSolverPure implements MazeSolver {
+public class GeneticSolverPureV1 implements MazeSolver {
 
-    private static final int POPULATION_SIZE = 100;
-    private static final int MAX_GENERATIONS = 300;
+    // AGGRESSIVE PARAMETERS
+    private static final int POPULATION_SIZE = 500; // 5x larger than original
+    private static final int MAX_GENERATIONS = 1000; // 5x longer evolution
     private static final double CROSSOVER_RATE = 0.85;
-    private static final double MUTATION_RATE = 0.15;
-    private static final int ELITISM_COUNT = 5;
+    private static final double MUTATION_RATE = 0.2; // Higher mutation to force exploration
+    private static final int ELITISM_COUNT = 20; // Keep top 20 safe
 
     private static final int[] DR = {-1, 1, 0, 0};
     private static final int[] DC = {0, 0, -1, 1};
@@ -36,9 +37,7 @@ public class GeneticSolverPure implements MazeSolver {
         long startTime = System.nanoTime();
         
         List<Individual> population = initializePopulation(context);
-        if (population.isEmpty()) {
-            return new AlgorithmResult("Failed", new ArrayList<>(), -1, System.nanoTime() - startTime, 0);
-        }
+        if (population.isEmpty()) return new AlgorithmResult("Failed", new ArrayList<>(), -1, System.nanoTime() - startTime, 0);
 
         Individual bestSolution = population.get(0);
         long nodesExpanded = 0;
@@ -50,24 +49,18 @@ public class GeneticSolverPure implements MazeSolver {
             }
 
             List<Individual> nextGen = new ArrayList<>();
-            for (int i = 0; i < ELITISM_COUNT && i < population.size(); i++) {
-                nextGen.add(population.get(i));
-            }
+            // Elitism
+            for (int i = 0; i < ELITISM_COUNT && i < population.size(); i++) nextGen.add(population.get(i));
 
             while (nextGen.size() < POPULATION_SIZE) {
                 Individual p1 = selectParent(population);
                 Individual p2 = selectParent(population);
 
                 Individual child;
-                if (Math.random() < CROSSOVER_RATE) {
-                    child = twoPointCrossover(p1, p2, context);
-                } else {
-                    child = p1;
-                }
+                if (Math.random() < CROSSOVER_RATE) child = twoPointCrossover(p1, p2, context);
+                else child = p1;
 
-                if (Math.random() < MUTATION_RATE) {
-                    child = mutate(child, context);
-                }
+                if (Math.random() < MUTATION_RATE) child = mutate(child, context);
 
                 nextGen.add(child);
                 nodesExpanded++;
@@ -79,44 +72,34 @@ public class GeneticSolverPure implements MazeSolver {
         return new AlgorithmResult("Success", bestSolution.path, bestSolution.cost, duration, nodesExpanded);
     }
 
+    // --- Standard Pure GA Methods (Same logic, just tuned params) ---
     private Individual twoPointCrossover(Individual p1, Individual p2, MazeContext ctx) {
         Set<String> p1Map = new HashSet<>();
         List<int[]> intersections = new ArrayList<>();
-        
         for(int[] p : p1.path) p1Map.add(key(p));
-        
         for(int i=1; i<p2.path.size()-1; i++) {
-            if (p1Map.contains(key(p2.path.get(i)))) {
-                intersections.add(p2.path.get(i));
-            }
+            if (p1Map.contains(key(p2.path.get(i)))) intersections.add(p2.path.get(i));
         }
-        
         if (intersections.isEmpty()) return p1;
 
         int[] cut = intersections.get((int)(Math.random() * intersections.size()));
-        
         List<int[]> newPath = new ArrayList<>();
-        
         for(int[] p : p1.path) {
             newPath.add(p);
             if(p[0] == cut[0] && p[1] == cut[1]) break;
         }
-        
         boolean recording = false;
         for(int[] p : p2.path) {
             if(p[0] == cut[0] && p[1] == cut[1]) recording = true;
-            if(recording && (p[0] != cut[0] || p[1] != cut[1])) {
-                newPath.add(p);
-            }
+            if(recording && (p[0] != cut[0] || p[1] != cut[1])) newPath.add(p);
         }
-        
         return new Individual(newPath, calculateCost(newPath, ctx));
     }
 
     private List<Individual> initializePopulation(MazeContext ctx) {
         List<Individual> pop = new ArrayList<>();
         int attempts = 0;
-        while(pop.size() < POPULATION_SIZE && attempts < POPULATION_SIZE * 10) {
+        while(pop.size() < POPULATION_SIZE && attempts < POPULATION_SIZE * 20) {
             List<int[]> path = generateRandomValidPath(ctx);
             if (path != null) pop.add(new Individual(path, calculateCost(path, ctx)));
             attempts++;
@@ -128,7 +111,6 @@ public class GeneticSolverPure implements MazeSolver {
         Stack<int[]> stack = new Stack<>();
         boolean[][] visited = new boolean[ctx.rows][ctx.cols];
         Map<String, int[]> parentMap = new HashMap<>();
-
         int[] start = {ctx.startRow, ctx.startCol};
         stack.push(start);
         visited[start[0]][start[1]] = true;
@@ -137,10 +119,8 @@ public class GeneticSolverPure implements MazeSolver {
         while (!stack.isEmpty()) {
             int[] curr = stack.pop();
             if (curr[0] == ctx.endRow && curr[1] == ctx.endCol) return reconstructPath(parentMap, curr);
-
             List<Integer> directions = Arrays.asList(0, 1, 2, 3);
             Collections.shuffle(directions); 
-
             for (int dir : directions) {
                 int nr = curr[0] + DR[dir];
                 int nc = curr[1] + DC[dir];
@@ -157,38 +137,32 @@ public class GeneticSolverPure implements MazeSolver {
     private Individual mutate(Individual ind, MazeContext ctx) {
         List<int[]> path = ind.path;
         if (path.size() < 5) return ind;
-
         int idx1 = (int) (Math.random() * (path.size() - 2));
         int idx2 = (int) (Math.random() * (path.size() - idx1 - 1)) + idx1 + 1;
-
-        int[] startNode = path.get(idx1);
-        int[] endNode = path.get(idx2);
-
+        
+        // Limited BFS for shortcut
         Queue<List<int[]>> queue = new LinkedList<>();
         List<int[]> init = new ArrayList<>();
-        init.add(startNode);
+        init.add(path.get(idx1));
         queue.add(init);
         Set<String> visited = new HashSet<>();
-        visited.add(key(startNode));
-
-        int limit = 200; 
+        visited.add(key(path.get(idx1)));
+        int limit = 300; 
+        
         while (!queue.isEmpty() && limit-- > 0) {
             List<int[]> currPath = queue.poll();
             int[] currPos = currPath.get(currPath.size() - 1);
-
-            if (currPos[0] == endNode[0] && currPos[1] == endNode[1]) {
+            if (currPos[0] == path.get(idx2)[0] && currPos[1] == path.get(idx2)[1]) {
                 List<int[]> newPath = new ArrayList<>();
                 for (int i = 0; i <= idx1; i++) newPath.add(path.get(i));
                 for (int i = 1; i < currPath.size() - 1; i++) newPath.add(currPath.get(i));
                 for (int i = idx2; i < path.size(); i++) newPath.add(path.get(i));
                 return new Individual(newPath, calculateCost(newPath, ctx));
             }
-
             List<Integer> dirs = Arrays.asList(0, 1, 2, 3);
             Collections.shuffle(dirs);
             for (int d : dirs) {
-                int nr = currPos[0] + DR[d];
-                int nc = currPos[1] + DC[d];
+                int nr = currPos[0] + DR[d], nc = currPos[1] + DC[d];
                 if (isValid(nr, nc, ctx) && !visited.contains(nr + "," + nc)) {
                     visited.add(nr + "," + nc);
                     List<int[]> nextPath = new ArrayList<>(currPath);
@@ -203,39 +177,27 @@ public class GeneticSolverPure implements MazeSolver {
     private boolean isValid(int r, int c, MazeContext ctx) {
         return r >= 0 && r < ctx.rows && c >= 0 && c < ctx.cols && ctx.getGridDirect()[r][c] != -1;
     }
-
-    // CHANGE: Sum cost from 2nd node to 2nd-to-last node
     private int calculateCost(List<int[]> path, MazeContext ctx) {
         if (path == null || path.size() <= 1) return 0;
         int sum = 0;
         int[][] grid = ctx.getGridDirect();
-        for (int i = 1; i < path.size() - 1; i++) {
-            int[] p = path.get(i);
-            sum += grid[p[0]][p[1]];
-        }
+        for (int i = 1; i < path.size() - 1; i++) sum += grid[path.get(i)[0]][path.get(i)[1]];
         return sum;
     }
-
     private List<int[]> reconstructPath(Map<String, int[]> parentMap, int[] end) {
         List<int[]> path = new ArrayList<>();
         int[] curr = end;
-        while (curr != null) {
-            path.add(curr);
-            curr = parentMap.get(key(curr));
-        }
+        while (curr != null) { path.add(curr); curr = parentMap.get(key(curr)); }
         Collections.reverse(path);
         return path;
     }
-
     private Individual selectParent(List<Individual> pop) {
-        int size = 3;
         Individual best = null;
-        for (int i = 0; i < size; i++) {
+        for (int i = 0; i < 5; i++) {
             Individual ind = pop.get((int) (Math.random() * pop.size()));
             if (best == null || ind.fitness > best.fitness) best = ind;
         }
         return best;
     }
-
     private String key(int[] p) { return p[0] + "," + p[1]; }
 }
