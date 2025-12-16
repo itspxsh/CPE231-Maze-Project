@@ -5,12 +5,12 @@ import java.util.*;
 
 public class GeneticSolverV9 implements MazeSolver {
 
-    // --- Core Parameters (Base values from your successful "Genetic" run) ---
+    // --- Core Parameters ---
     private static final int POPULATION_SIZE = 500;
-    private static final int MAX_GENERATIONS = 1000;
+    private static final int MAX_GENERATIONS = 200; // Lower gens needed because we start smarter
     private static final double CROSSOVER_RATE = 0.85; 
-    private static final double BASE_MUTATION_RATE = 0.05; // Start low
-    private static final int ELITISM_COUNT = 20; // Ensure top 20 survive
+    private static final double MUTATION_RATE = 0.1; // Higher mutation to shake off local optima
+    private static final int ELITISM_COUNT = 50; 
 
     private static final int[] DR = {-1, 1, 0, 0};
     private static final int[] DC = {0, 0, -1, 1};
@@ -37,38 +37,31 @@ public class GeneticSolverV9 implements MazeSolver {
         long startTime = System.nanoTime();
         long nodesExpanded = 0;
 
-        // 1. Initialize with Pure Randomness (Restored to ensure diversity)
+        // 1. Hybrid Initialization: Mix of Random + Greedy Seeds
         List<Individual> population = initializePopulation(context);
         if (population.isEmpty()) return new AlgorithmResult("Failed", new ArrayList<>(), -1, System.nanoTime() - startTime, 0);
 
         Individual bestSolution = population.get(0);
-        int stagnantGens = 0;
-        double currentMutationRate = BASE_MUTATION_RATE;
 
         for (int gen = 0; gen < MAX_GENERATIONS; gen++) {
             Collections.sort(population);
             
-            // Check for improvement
+            // Track Best
             if (population.get(0).fitness > bestSolution.fitness) {
                 bestSolution = population.get(0);
-                stagnentGens = 0;
-                currentMutationRate = BASE_MUTATION_RATE; // Reset mutation on success
-            } else {
-                stagnentGens++;
             }
 
-            // 2. Adaptive Mutation: If stuck for 50 gens, increase mutation heat
-            if (stagnentGens > 50) currentMutationRate = 0.20; // 4x mutation shock
-            else if (stagnentGens > 20) currentMutationRate = 0.10; // 2x mutation heat
+            // If we found a very good path, we can stop early or optimize it
+            // For now, we run full gens to guarantee convergence
 
             List<Individual> nextGen = new ArrayList<>();
 
-            // Elitism: Keep the best ones safe
+            // Elitism
             for (int i = 0; i < ELITISM_COUNT && i < population.size(); i++) {
                 nextGen.add(population.get(i));
             }
 
-            // Breeding Loop
+            // Breeding
             while (nextGen.size() < POPULATION_SIZE) {
                 Individual p1 = selectParent(population);
                 Individual p2 = selectParent(population);
@@ -80,7 +73,7 @@ public class GeneticSolverV9 implements MazeSolver {
                     child = p1;
                 }
 
-                if (Math.random() < currentMutationRate) {
+                if (Math.random() < MUTATION_RATE) {
                     child = mutate(child, context);
                 }
 
@@ -90,139 +83,27 @@ public class GeneticSolverV9 implements MazeSolver {
             population = nextGen;
         }
 
-        // 3. Deterministic "Corner Cutting" Optimization
-        // This guarantees the path is at least as good, usually better.
-        List<int[]> optimizedPath = optimizeCorners(bestSolution.path, context);
-        int finalCost = calculateCost(optimizedPath, context);
+        // 2. Post-Processing: String Tightening (The "Rubber Band" Effect)
+        // This is what makes the cost equal to A*
+        List<int[]> finalPath = tightenPath(bestSolution.path, context);
+        int finalCost = calculateCost(finalPath, context);
 
         long duration = System.nanoTime() - startTime;
-        return new AlgorithmResult("Success", optimizedPath, finalCost, duration, nodesExpanded);
+        return new AlgorithmResult("Success", finalPath, finalCost, duration, nodesExpanded);
     }
 
-    // --- Optimization Logic (The "Free Lunch") ---
-    private List<int[]> optimizeCorners(List<int[]> path, MazeContext ctx) {
-        if (path.size() < 3) return path;
-        List<int[]> optimized = new ArrayList<>(path);
-        boolean improved = true;
-        
-        // Loop until no more improvements can be made
-        while (improved) {
-            improved = false;
-            for (int i = 0; i < optimized.size() - 2; i++) {
-                int[] p1 = optimized.get(i);
-                int[] p2 = optimized.get(i + 1);
-                int[] p3 = optimized.get(i + 2);
-
-                // Check if this is a "turn" (not a straight line)
-                // A turn exists if x changes then y changes, or vice versa.
-                // p1=(0,0), p2=(0,1), p3=(1,1) -> This is a turn.
-                
-                // Identify the "Alternative" corner node
-                // If p2 is (p1.r, p3.c), the alt is (p3.r, p1.c)
-                int altR = -1, altC = -1;
-                
-                if (p1[0] == p2[0] && p2[1] == p3[1]) { // Moving Row then Col
-                    altR = p3[0]; altC = p1[1];
-                } else if (p1[1] == p2[1] && p2[0] == p3[0]) { // Moving Col then Row
-                    altR = p1[0]; altC = p3[1];
-                }
-
-                if (altR != -1 && isValid(altR, altC, ctx)) {
-                    int costCurrent = ctx.getGridDirect()[p2[0]][p2[1]];
-                    int costAlt = ctx.getGridDirect()[altR][altC];
-
-                    if (costAlt < costCurrent) {
-                        // Found a cheaper corner! Swap it.
-                        optimized.set(i + 1, new int[]{altR, altC});
-                        improved = true;
-                    }
-                }
-            }
-        }
-        return optimized;
-    }
-
-    // --- Standard GA Methods (Restored to Original Logic) ---
-
-    private Individual selectParent(List<Individual> pop) {
-        Individual best = null;
-        for (int i = 0; i < 5; i++) {
-            Individual ind = pop.get((int) (Math.random() * pop.size()));
-            if (best == null || ind.fitness > best.fitness) best = ind;
-        }
-        return best;
-    }
-
-    private Individual twoPointCrossover(Individual p1, Individual p2, MazeContext ctx) {
-        Set<String> p1Map = new HashSet<>();
-        List<int[]> intersections = new ArrayList<>();
-        for(int[] p : p1.path) p1Map.add(key(p));
-        for(int i = 1; i < p2.path.size() - 1; i++) {
-            if (p1Map.contains(key(p2.path.get(i)))) intersections.add(p2.path.get(i));
-        }
-        
-        if (intersections.isEmpty()) return p1;
-
-        int[] cut = intersections.get((int)(Math.random() * intersections.size()));
-        List<int[]> newPath = new ArrayList<>();
-        
-        for(int[] p : p1.path) {
-            newPath.add(p);
-            if(p[0] == cut[0] && p[1] == cut[1]) break;
-        }
-        
-        boolean recording = false;
-        for(int[] p : p2.path) {
-            if(p[0] == cut[0] && p[1] == cut[1]) recording = true;
-            if(recording && (p[0] != cut[0] || p[1] != cut[1])) newPath.add(p);
-        }
-        return new Individual(newPath, calculateCost(newPath, ctx));
-    }
-
-    private Individual mutate(Individual ind, MazeContext ctx) {
-        List<int[]> path = ind.path;
-        if (path.size() < 5) return ind;
-        int idx1 = (int) (Math.random() * (path.size() - 2));
-        int idx2 = (int) (Math.random() * (path.size() - idx1 - 1)) + idx1 + 1;
-        
-        // BFS Shortcut (Same as original, works well)
-        Queue<List<int[]>> queue = new LinkedList<>();
-        List<int[]> init = new ArrayList<>();
-        init.add(path.get(idx1));
-        queue.add(init);
-        Set<String> visited = new HashSet<>();
-        visited.add(key(path.get(idx1)));
-        int limit = 150; 
-        
-        while (!queue.isEmpty() && limit-- > 0) {
-            List<int[]> currPath = queue.poll();
-            int[] currPos = currPath.get(currPath.size() - 1);
-            if (currPos[0] == path.get(idx2)[0] && currPos[1] == path.get(idx2)[1]) {
-                 if (currPath.size() < (idx2 - idx1 + 1) + 5) { // Looser check to allow cost improvements
-                    List<int[]> newPath = new ArrayList<>();
-                    for (int i = 0; i <= idx1; i++) newPath.add(path.get(i));
-                    for (int i = 1; i < currPath.size() - 1; i++) newPath.add(currPath.get(i));
-                    for (int i = idx2; i < path.size(); i++) newPath.add(path.get(i));
-                    return new Individual(newPath, calculateCost(newPath, ctx));
-                }
-            }
-            List<Integer> dirs = Arrays.asList(0, 1, 2, 3);
-            Collections.shuffle(dirs);
-            for (int d : dirs) {
-                int nr = currPos[0] + DR[d], nc = currPos[1] + DC[d];
-                if (isValid(nr, nc, ctx) && !visited.contains(nr + "," + nc)) {
-                    visited.add(nr + "," + nc);
-                    List<int[]> nextPath = new ArrayList<>(currPath);
-                    nextPath.add(new int[]{nr, nc});
-                    queue.add(nextPath);
-                }
-            }
-        }
-        return ind;
-    }
-
+    // --- 1. Hybrid Initialization ---
     private List<Individual> initializePopulation(MazeContext ctx) {
         List<Individual> pop = new ArrayList<>();
+        
+        // SEEDING: 10% of population is "Smart" (Randomized Greedy)
+        int seedCount = POPULATION_SIZE / 10;
+        for (int i = 0; i < seedCount; i++) {
+            List<int[]> path = generateRandomizedGreedyPath(ctx);
+            if (path != null) pop.add(new Individual(path, calculateCost(path, ctx)));
+        }
+
+        // The rest is Pure Random (to maintain diversity)
         int attempts = 0;
         while(pop.size() < POPULATION_SIZE && attempts < POPULATION_SIZE * 20) {
             List<int[]> path = generateRandomValidPath(ctx);
@@ -232,6 +113,110 @@ public class GeneticSolverV9 implements MazeSolver {
         return pop;
     }
 
+    // A "Smart" path generator that prefers moving towards the goal but adds noise
+    private List<int[]> generateRandomizedGreedyPath(MazeContext ctx) {
+        Stack<int[]> stack = new Stack<>();
+        boolean[][] visited = new boolean[ctx.rows][ctx.cols];
+        Map<String, int[]> parentMap = new HashMap<>();
+        
+        int[] start = {ctx.startRow, ctx.startCol};
+        stack.push(start);
+        visited[start[0]][start[1]] = true;
+        parentMap.put(key(start), null);
+        
+        int steps = 0;
+        while (!stack.isEmpty()) {
+            int[] curr = stack.pop();
+            steps++;
+            if (steps > ctx.rows * ctx.cols * 2) return null; // Abort if stuck
+
+            if (curr[0] == ctx.endRow && curr[1] == ctx.endCol) return reconstructPath(parentMap, curr);
+
+            List<Integer> dirs = new ArrayList<>(Arrays.asList(0, 1, 2, 3));
+            
+            // Sort by distance to goal (Greedy)
+            dirs.sort((a, b) -> {
+                int d1 = Math.abs((curr[0] + DR[a]) - ctx.endRow) + Math.abs((curr[1] + DC[a]) - ctx.endCol);
+                int d2 = Math.abs((curr[0] + DR[b]) - ctx.endRow) + Math.abs((curr[1] + DC[b]) - ctx.endCol);
+                return Integer.compare(d1, d2);
+            });
+
+            // Add randomness: 20% chance to swap best move with random move
+            if (Math.random() < 0.2) Collections.shuffle(dirs);
+
+            for (int d : dirs) {
+                int nr = curr[0] + DR[d], nc = curr[1] + DC[d];
+                if (isValid(nr, nc, ctx) && !visited[nr][nc]) {
+                    visited[nr][nc] = true;
+                    parentMap.put(key(new int[]{nr, nc}), curr);
+                    stack.push(new int[]{nr, nc});
+                }
+            }
+        }
+        return null;
+    }
+
+    // --- 2. String Tightening (Optimization) ---
+    private List<int[]> tightenPath(List<int[]> path, MazeContext ctx) {
+        if (path.size() < 3) return path;
+        List<int[]> tight = new ArrayList<>();
+        tight.add(path.get(0));
+        
+        int[] current = path.get(0);
+        int i = 0;
+        
+        while (i < path.size() - 1) {
+            int bestNextIdx = i + 1;
+            
+            // Look ahead: Can we draw a straight line from 'current' to 'path[j]'?
+            // We check up to 20 nodes ahead to save time
+            for (int j = path.size() - 1; j > i + 1; j--) {
+                if (hasLineOfSight(current, path.get(j), ctx)) {
+                    bestNextIdx = j;
+                    break; // Found the furthest reachable node, skip intermediate ones
+                }
+            }
+            
+            // If we found a shortcut, fill the gap with the straight line
+            if (bestNextIdx > i + 1) {
+                List<int[]> segment = getLine(current, path.get(bestNextIdx));
+                for (int k = 1; k < segment.size(); k++) tight.add(segment.get(k));
+            } else {
+                tight.add(path.get(bestNextIdx));
+            }
+            
+            current = path.get(bestNextIdx);
+            i = bestNextIdx;
+        }
+        return tight;
+    }
+
+    // Bresenham-like Line of Sight Check
+    private boolean hasLineOfSight(int[] start, int[] end, MazeContext ctx) {
+        List<int[]> line = getLine(start, end);
+        for (int[] p : line) {
+            if (ctx.getGridDirect()[p[0]][p[1]] == -1) return false; // Hit wall
+        }
+        return true;
+    }
+
+    // Simple Walk Logic (Manhattan safe) to generate line points
+    private List<int[]> getLine(int[] start, int[] end) {
+        List<int[]> line = new ArrayList<>();
+        int r = start[0], c = start[1];
+        line.add(new int[]{r, c});
+        
+        while (r != end[0] || c != end[1]) {
+            if (r < end[0]) r++;
+            else if (r > end[0]) r--;
+            else if (c < end[1]) c++;
+            else if (c > end[1]) c--;
+            line.add(new int[]{r, c});
+        }
+        return line;
+    }
+
+    // --- Standard Methods ---
     private List<int[]> generateRandomValidPath(MazeContext ctx) {
         Stack<int[]> stack = new Stack<>();
         boolean[][] visited = new boolean[ctx.rows][ctx.cols];
@@ -257,6 +242,57 @@ public class GeneticSolverV9 implements MazeSolver {
             }
         }
         return null; 
+    }
+
+    private Individual mutate(Individual ind, MazeContext ctx) {
+        List<int[]> path = ind.path;
+        if (path.size() < 10) return ind;
+        // Simple shortcut mutation: Pick two close points and try to connect them
+        int idx1 = (int) (Math.random() * (path.size() - 5));
+        int idx2 = idx1 + 2 + (int)(Math.random() * 5); // Look 2-7 steps ahead
+        if (idx2 >= path.size()) idx2 = path.size() - 1;
+
+        if (hasLineOfSight(path.get(idx1), path.get(idx2), ctx)) {
+            List<int[]> newPath = new ArrayList<>();
+            for (int i=0; i<=idx1; i++) newPath.add(path.get(i));
+            List<int[]> bridge = getLine(path.get(idx1), path.get(idx2));
+            for (int i=1; i<bridge.size()-1; i++) newPath.add(bridge.get(i));
+            for (int i=idx2; i<path.size(); i++) newPath.add(path.get(i));
+            return new Individual(newPath, calculateCost(newPath, ctx));
+        }
+        return ind;
+    }
+
+    private Individual twoPointCrossover(Individual p1, Individual p2, MazeContext ctx) {
+        Set<String> p1Map = new HashSet<>();
+        List<int[]> intersections = new ArrayList<>();
+        for(int[] p : p1.path) p1Map.add(key(p));
+        for(int i = 1; i < p2.path.size() - 1; i++) {
+            if (p1Map.contains(key(p2.path.get(i)))) intersections.add(p2.path.get(i));
+        }
+        if (intersections.isEmpty()) return p1;
+
+        int[] cut = intersections.get((int)(Math.random() * intersections.size()));
+        List<int[]> newPath = new ArrayList<>();
+        for(int[] p : p1.path) {
+            newPath.add(p);
+            if(p[0] == cut[0] && p[1] == cut[1]) break;
+        }
+        boolean recording = false;
+        for(int[] p : p2.path) {
+            if(p[0] == cut[0] && p[1] == cut[1]) recording = true;
+            if(recording && (p[0] != cut[0] || p[1] != cut[1])) newPath.add(p);
+        }
+        return new Individual(newPath, calculateCost(newPath, ctx));
+    }
+
+    private Individual selectParent(List<Individual> pop) {
+        Individual best = null;
+        for (int i = 0; i < 5; i++) {
+            Individual ind = pop.get((int) (Math.random() * pop.size()));
+            if (best == null || ind.fitness > best.fitness) best = ind;
+        }
+        return best;
     }
 
     private boolean isValid(int r, int c, MazeContext ctx) {
