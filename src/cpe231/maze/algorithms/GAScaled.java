@@ -5,16 +5,13 @@ import java.util.*;
 
 public class GAScaled implements MazeSolver {
 
-    // ==========================================
     // EXPERIMENT C: SEARCH VOLUME (SCALED)
-    // Hypothesis: Large mazes require "Critical Mass" of agents.
-    // ==========================================
-    private static final int POPULATION_SIZE = 500;  // VARIABLE: 5x Baseline
-    private static final int MAX_GENERATIONS = 1000; // VARIABLE: 3x Baseline
+    private static final int POPULATION_SIZE = 500;
+    private static final int MAX_GENERATIONS = 1000;
     
     private static final double CROSSOVER_RATE = 0.85;
-    private static final double MUTATION_RATE = 0.20; // Slightly increased
-    private static final int ELITISM_COUNT = 20;      // Proportional Elitism
+    private static final double MUTATION_RATE = 0.20;
+    private static final int ELITISM_COUNT = 20;
 
     private static final int[] DR = {-1, 1, 0, 0};
     private static final int[] DC = {0, 0, -1, 1};
@@ -33,7 +30,7 @@ public class GAScaled implements MazeSolver {
     public AlgorithmResult solve(MazeContext context) {
         long startTime = System.nanoTime();
         List<Individual> population = initializePopulation(context);
-        if (population.isEmpty()) return new AlgorithmResult("Failed", new ArrayList<>(), -1, 0, 0);
+        if (population.isEmpty()) return new AlgorithmResult("Failed", new ArrayList<>(), -1, System.nanoTime() - startTime, 0);
 
         Individual bestSolution = population.get(0);
         long nodesExpanded = 0;
@@ -60,7 +57,8 @@ public class GAScaled implements MazeSolver {
             nodesExpanded += population.size();
         }
 
-        return new AlgorithmResult(isSolution(bestSolution, context) ? "Success" : "Failed", bestSolution.path, bestSolution.cost, (System.nanoTime() - startTime) / 1e6, nodesExpanded);
+        long durationNs = System.nanoTime() - startTime;
+        return new AlgorithmResult(isSolution(bestSolution, context) ? "Success" : "Failed", bestSolution.path, bestSolution.cost, durationNs, nodesExpanded);
     }
     
     // --- Helper Methods ---
@@ -72,7 +70,7 @@ public class GAScaled implements MazeSolver {
         }
         return pop;
     }
-    private List<int[]> bfsInit(MazeContext ctx) { return bfsInitPart(ctx.start, ctx); }
+    private List<int[]> bfsInit(MazeContext ctx) { return bfsInitPart(new int[]{ctx.startRow, ctx.startCol}, ctx); }
     private List<int[]> bfsInitPart(int[] start, MazeContext ctx) {
         Queue<List<int[]>> q = new LinkedList<>();
         List<int[]> init = new ArrayList<>(); init.add(start); q.add(init);
@@ -81,7 +79,7 @@ public class GAScaled implements MazeSolver {
         while(!q.isEmpty() && steps<max) {
             List<int[]> p = q.poll(); steps++;
             int[] c = p.get(p.size()-1);
-            if(c[0]==ctx.end[0] && c[1]==ctx.end[1]) return p;
+            if(c[0]==ctx.endRow && c[1]==ctx.endCol) return p;
             List<Integer> d = Arrays.asList(0,1,2,3); Collections.shuffle(d);
             for(int dir : d) {
                 int nr=c[0]+DR[dir], nc=c[1]+DC[dir];
@@ -113,12 +111,12 @@ public class GAScaled implements MazeSolver {
         }
         return best;
     }
-    private boolean isValid(int r, int c, MazeContext ctx) { return r>=0 && r<ctx.rows && c>=0 && c<ctx.cols && ctx.getGridDirect()[r][c]!=-1; }
+    private boolean isValid(int r, int c, MazeContext ctx) { return ctx.isValid(r, c); }
     private int calculateCost(List<int[]> path, MazeContext ctx) {
         if(path==null || path.size()<=1) return 0;
-        int sum=0; for(int i=1; i<path.size()-1; i++) sum+=ctx.getGridDirect()[path.get(i)[0]][path.get(i)[1]];
+        int sum=0; for(int i=1; i<path.size()-1; i++) sum+=ctx.getCost(path.get(i)[0], path.get(i)[1]);
         return sum;
     }
-    private boolean isSolution(Individual ind, MazeContext ctx) { return !ind.path.isEmpty() && ind.path.get(ind.path.size()-1)[0]==ctx.end[0] && ind.path.get(ind.path.size()-1)[1]==ctx.end[1]; }
+    private boolean isSolution(Individual ind, MazeContext ctx) { return !ind.path.isEmpty() && ind.path.get(ind.path.size()-1)[0]==ctx.endRow && ind.path.get(ind.path.size()-1)[1]==ctx.endCol; }
     private String key(int[] p) { return p[0]+","+p[1]; }
 }

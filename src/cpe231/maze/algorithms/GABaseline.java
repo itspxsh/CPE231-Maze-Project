@@ -5,10 +5,7 @@ import java.util.*;
 
 public class GABaseline implements MazeSolver {
 
-    // ==========================================
     // CONTROL GROUP (BASELINE)
-    // Purpose: Standard implementation to measure base performance.
-    // ==========================================
     private static final int POPULATION_SIZE = 100;
     private static final int MAX_GENERATIONS = 300;
     private static final double CROSSOVER_RATE = 0.85;
@@ -40,7 +37,9 @@ public class GABaseline implements MazeSolver {
         long startTime = System.nanoTime();
         
         List<Individual> population = initializePopulation(context);
-        if (population.isEmpty()) return new AlgorithmResult("Failed", new ArrayList<>(), -1, System.nanoTime() - startTime, 0);
+        if (population.isEmpty()) {
+            return new AlgorithmResult("Failed", new ArrayList<>(), -1, System.nanoTime() - startTime, 0);
+        }
 
         Individual bestSolution = population.get(0);
         long nodesExpanded = 0;
@@ -54,37 +53,29 @@ public class GABaseline implements MazeSolver {
             if (isSolution(bestSolution, context)) break;
 
             List<Individual> newPop = new ArrayList<>();
-            
-            // Elitism
             for (int i = 0; i < ELITISM_COUNT; i++) {
                 if (i < population.size()) newPop.add(population.get(i));
             }
 
-            // Reproduction
             while (newPop.size() < POPULATION_SIZE) {
                 Individual p1 = selectParent(population);
                 Individual p2 = selectParent(population);
                 Individual child = p1;
 
-                if (Math.random() < CROSSOVER_RATE) {
-                    child = crossover(p1, p2, context);
-                }
-
-                if (Math.random() < MUTATION_RATE) {
-                    child = mutate(child, context);
-                }
+                if (Math.random() < CROSSOVER_RATE) child = crossover(p1, p2, context);
+                if (Math.random() < MUTATION_RATE) child = mutate(child, context);
                 newPop.add(child);
             }
             population = newPop;
             nodesExpanded += population.size();
         }
 
-        long endTime = System.nanoTime();
+        long durationNs = System.nanoTime() - startTime;
         return new AlgorithmResult(
             isSolution(bestSolution, context) ? "Success" : "Failed",
             bestSolution.path,
             bestSolution.cost,
-            (endTime - startTime) / 1_000_000.0,
+            durationNs, // Passing long (nanoseconds) as expected by Record
             nodesExpanded
         );
     }
@@ -101,7 +92,8 @@ public class GABaseline implements MazeSolver {
     }
 
     private List<int[]> bfsInit(MazeContext ctx) {
-        return bfsInitPart(ctx.start, ctx);
+        // Fix: Construct start array from integer fields
+        return bfsInitPart(new int[]{ctx.startRow, ctx.startCol}, ctx);
     }
 
     private List<int[]> bfsInitPart(int[] start, MazeContext ctx) {
@@ -113,16 +105,16 @@ public class GABaseline implements MazeSolver {
         visited.add(key(start));
         
         int steps = 0;
-        int maxSteps = (ctx.rows * ctx.cols) * 2; // Prevention of infinite loops
+        int maxSteps = (ctx.rows * ctx.cols) * 2; 
 
         while (!queue.isEmpty() && steps < maxSteps) {
             List<int[]> path = queue.poll();
             int[] curr = path.get(path.size() - 1);
             steps++;
 
-            if (curr[0] == ctx.end[0] && curr[1] == ctx.end[1]) return path;
+            // Fix: Compare against endRow/endCol fields
+            if (curr[0] == ctx.endRow && curr[1] == ctx.endCol) return path;
 
-            // Randomize directions for variety
             List<Integer> dirs = Arrays.asList(0, 1, 2, 3);
             Collections.shuffle(dirs);
 
@@ -134,16 +126,14 @@ public class GABaseline implements MazeSolver {
                     List<int[]> newPath = new ArrayList<>(path);
                     newPath.add(new int[]{nr, nc});
                     queue.add(newPath);
-                    // Optimization: Greedy pick first valid move often helps init speed
                     if(Math.random() < 0.5) break; 
                 }
             }
         }
-        return null; // Should fall back or retry if null
+        return null;
     }
 
     private Individual crossover(Individual p1, Individual p2, MazeContext ctx) {
-        // Find common points
         Set<String> p1Set = new HashSet<>();
         for (int[] p : p1.path) p1Set.add(key(p));
         
@@ -153,10 +143,8 @@ public class GABaseline implements MazeSolver {
         }
         
         if (common.isEmpty()) return p1;
-        
         int[] splicePoint = common.get((int)(Math.random() * common.size()));
         
-        // Splicing paths
         List<int[]> newPath = new ArrayList<>();
         for(int[] p : p1.path) {
             newPath.add(p);
@@ -177,18 +165,15 @@ public class GABaseline implements MazeSolver {
         int idx = 1 + (int)(Math.random() * (ind.path.size() - 2));
         int[] startNode = ind.path.get(idx);
         
-        // Try to find a new path from this node to end
         List<int[]> tail = bfsInitPart(startNode, ctx);
         if (tail == null) return ind;
         
         List<int[]> newPath = new ArrayList<>(ind.path.subList(0, idx));
         newPath.addAll(tail);
-        
         return new Individual(newPath, calculateCost(newPath, ctx));
     }
 
     private Individual selectParent(List<Individual> pop) {
-        // Tournament Selection
         int tournamentSize = 3;
         Individual best = null;
         for(int i=0; i<tournamentSize; i++) {
@@ -199,15 +184,16 @@ public class GABaseline implements MazeSolver {
     }
 
     private boolean isValid(int r, int c, MazeContext ctx) {
-        return r >= 0 && r < ctx.rows && c >= 0 && c < ctx.cols && ctx.getGridDirect()[r][c] != -1;
+        // Fix: Use getCost to be safe, or check bounds manually
+        return ctx.isValid(r, c);
     }
 
     private int calculateCost(List<int[]> path, MazeContext ctx) {
         if (path == null || path.size() <= 1) return 0;
         int sum = 0;
-        int[][] grid = ctx.getGridDirect();
         for (int i = 1; i < path.size() - 1; i++) {
-            sum += grid[path.get(i)[0]][path.get(i)[1]];
+            // Fix: Use getCost() instead of direct grid access
+            sum += ctx.getCost(path.get(i)[0], path.get(i)[1]);
         }
         return sum;
     }
@@ -215,7 +201,8 @@ public class GABaseline implements MazeSolver {
     private boolean isSolution(Individual ind, MazeContext ctx) {
         if (ind.path.isEmpty()) return false;
         int[] last = ind.path.get(ind.path.size() - 1);
-        return last[0] == ctx.end[0] && last[1] == ctx.end[1];
+        // Fix: Compare against fields
+        return last[0] == ctx.endRow && last[1] == ctx.endCol;
     }
 
     private String key(int[] p) { return p[0] + "," + p[1]; }

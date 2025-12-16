@@ -5,17 +5,13 @@ import java.util.*;
 
 public class GAAdaptive implements MazeSolver {
 
-    // ==========================================
     // EXPERIMENT A: ADAPTIVITY
-    // Hypothesis: Dynamic mutation rates improve convergence accuracy.
-    // ==========================================
     private static final int POPULATION_SIZE = 200; 
     private static final int MAX_GENERATIONS = 500;
     private static final double CROSSOVER_RATE = 0.8;
     
-    // VARIABLE: Dynamic Mutation Parameters
-    private static final double START_MUTATION = 0.5; // Chaotic start
-    private static final double END_MUTATION = 0.01;  // Precise finish
+    private static final double START_MUTATION = 0.5;
+    private static final double END_MUTATION = 0.01;
     private static final int ELITISM_COUNT = 5;
 
     private static final int[] DR = {-1, 1, 0, 0};
@@ -35,7 +31,7 @@ public class GAAdaptive implements MazeSolver {
     public AlgorithmResult solve(MazeContext context) {
         long startTime = System.nanoTime();
         List<Individual> population = initializePopulation(context);
-        if (population.isEmpty()) return new AlgorithmResult("Failed", new ArrayList<>(), -1, 0, 0);
+        if (population.isEmpty()) return new AlgorithmResult("Failed", new ArrayList<>(), -1, System.nanoTime() - startTime, 0);
 
         Individual bestSolution = population.get(0);
         long nodesExpanded = 0;
@@ -45,7 +41,6 @@ public class GAAdaptive implements MazeSolver {
             if (population.get(0).fitness > bestSolution.fitness) bestSolution = population.get(0);
             if (isSolution(bestSolution, context)) break;
 
-            // DYNAMIC MUTATION CALCULATION
             double currentMutation = START_MUTATION + (END_MUTATION - START_MUTATION) * (gen / (double)MAX_GENERATIONS);
 
             List<Individual> newPop = new ArrayList<>();
@@ -57,7 +52,6 @@ public class GAAdaptive implements MazeSolver {
                 Individual child = p1;
 
                 if (Math.random() < CROSSOVER_RATE) child = crossover(p1, p2, context);
-                // Use Dynamic Rate
                 if (Math.random() < currentMutation) child = mutate(child, context);
                 
                 newPop.add(child);
@@ -66,10 +60,11 @@ public class GAAdaptive implements MazeSolver {
             nodesExpanded += population.size();
         }
 
-        return new AlgorithmResult(isSolution(bestSolution, context) ? "Success" : "Failed", bestSolution.path, bestSolution.cost, (System.nanoTime() - startTime) / 1e6, nodesExpanded);
+        long durationNs = System.nanoTime() - startTime;
+        return new AlgorithmResult(isSolution(bestSolution, context) ? "Success" : "Failed", bestSolution.path, bestSolution.cost, durationNs, nodesExpanded);
     }
 
-    // --- HELPER METHODS (Standard Implementation) ---
+    // --- HELPER METHODS ---
     private List<Individual> initializePopulation(MazeContext ctx) {
         List<Individual> pop = new ArrayList<>();
         for(int i=0; i<POPULATION_SIZE; i++) {
@@ -78,7 +73,8 @@ public class GAAdaptive implements MazeSolver {
         }
         return pop;
     }
-    private List<int[]> bfsInit(MazeContext ctx) { return bfsInitPart(ctx.start, ctx); }
+    private List<int[]> bfsInit(MazeContext ctx) { return bfsInitPart(new int[]{ctx.startRow, ctx.startCol}, ctx); }
+    
     private List<int[]> bfsInitPart(int[] start, MazeContext ctx) {
         Queue<List<int[]>> q = new LinkedList<>();
         List<int[]> init = new ArrayList<>(); init.add(start); q.add(init);
@@ -87,7 +83,7 @@ public class GAAdaptive implements MazeSolver {
         while(!q.isEmpty() && steps<max) {
             List<int[]> p = q.poll(); steps++;
             int[] c = p.get(p.size()-1);
-            if(c[0]==ctx.end[0] && c[1]==ctx.end[1]) return p;
+            if(c[0]==ctx.endRow && c[1]==ctx.endCol) return p;
             List<Integer> d = Arrays.asList(0,1,2,3); Collections.shuffle(d);
             for(int dir : d) {
                 int nr=c[0]+DR[dir], nc=c[1]+DC[dir];
@@ -101,10 +97,7 @@ public class GAAdaptive implements MazeSolver {
         }
         return null;
     }
-    private Individual crossover(Individual p1, Individual p2, MazeContext ctx) {
-        // Simple crossover logic
-        return p1; // Placeholder for brevity, use full logic if needed, but standard GA often relies on mutation more.
-    }
+    private Individual crossover(Individual p1, Individual p2, MazeContext ctx) { return p1; }
     private Individual mutate(Individual ind, MazeContext ctx) {
          if (ind.path.size() < 2) return ind;
         int idx = 1 + (int)(Math.random() * (ind.path.size() - 2));
@@ -122,12 +115,12 @@ public class GAAdaptive implements MazeSolver {
         }
         return best;
     }
-    private boolean isValid(int r, int c, MazeContext ctx) { return r>=0 && r<ctx.rows && c>=0 && c<ctx.cols && ctx.getGridDirect()[r][c]!=-1; }
+    private boolean isValid(int r, int c, MazeContext ctx) { return ctx.isValid(r, c); }
     private int calculateCost(List<int[]> path, MazeContext ctx) {
         if(path==null || path.size()<=1) return 0;
-        int sum=0; for(int i=1; i<path.size()-1; i++) sum+=ctx.getGridDirect()[path.get(i)[0]][path.get(i)[1]];
+        int sum=0; for(int i=1; i<path.size()-1; i++) sum+=ctx.getCost(path.get(i)[0], path.get(i)[1]);
         return sum;
     }
-    private boolean isSolution(Individual ind, MazeContext ctx) { return !ind.path.isEmpty() && ind.path.get(ind.path.size()-1)[0]==ctx.end[0] && ind.path.get(ind.path.size()-1)[1]==ctx.end[1]; }
+    private boolean isSolution(Individual ind, MazeContext ctx) { return !ind.path.isEmpty() && ind.path.get(ind.path.size()-1)[0]==ctx.endRow && ind.path.get(ind.path.size()-1)[1]==ctx.endCol; }
     private String key(int[] p) { return p[0]+","+p[1]; }
 }

@@ -299,8 +299,8 @@ public class VisualizationApp extends JFrame {
         MazeSolver[] solvers = {
             new AStarSolver(),
             new DijkstraSolver(),
-            new GeneticSolverPure(),
-            new MemeticSolver() 
+            new GeneticSolverPureV1(),
+            new HybridGeneticSolver()
         };
 
         for (int i = 0; i < 4; i++) {
