@@ -94,7 +94,10 @@ CPE231-MAZE-PROJECT/
 │   ├── io/             # File parsing and maze loading logic
 │   ├── ui/             # Swing-based GUI (VisualizationApp, MazePanel)
 │   └── benchmark/      # Headless performance testing suite
-├── data/               # Test cases (e.g., m15_15.txt, m100_100.txt)
+├── data/               # Input maze test cases (e.g., m15_15.txt, m100_100.txt)
+├── output/             # Generated and example benchmark outputs
+│   └── results/        # Example benchmark CSV result files
+├── docs/               # Project documentation (PDF report)
 └── bin/                # Compiled bytecode
 ```
 
