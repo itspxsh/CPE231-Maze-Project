@@ -1,7 +1,9 @@
 # 🧩 CPE231 Maze Pathfinding Project
 
 **Course:** CPE231 Algorithms
+
 **Project Type:** Algorithm Analysis & Comparison (Heuristic Search vs. Evolutionary Computation)
+
 **Language:** Java (Swing GUI)
 
 ---
